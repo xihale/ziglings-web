@@ -1,0 +1,3 @@
+[submodule "vendor/ziglings-src"]
+	path = vendor/ziglings-src
+	url = https://codeberg.org/ziglings/exercises.git
