@@ -20,6 +20,12 @@ export type VersionEntry = {
 
 export type VersionsManifest = {
   default: string;
+  /**
+   * Optional absolute origin serving /compilers/<id>/… If present, compiler
+   * assets are fetched cross-origin from here (spec §6.3: reuse the
+   * playground's deployed compiler assets rather than self-building wasm).
+   */
+  assetOrigin?: string;
   versions: VersionEntry[];
 };
 
@@ -93,6 +99,14 @@ export function pathForVersion(id: string, manifest: VersionsManifest): string {
 
 /** Absolute URL prefix for compiler assets of a version. */
 export function compilerAssetBase(versionId: string): string {
+  // Prefer the cross-origin asset origin (spec §6.3) when the manifest
+  // declares one; otherwise fall back to this site's own /compilers/<id>/.
+  const manifest = loadVersionsManifest();
+  const origin = manifest.assetOrigin;
+  if (origin) {
+    const root = origin.endsWith("/") ? origin : `${origin}/`;
+    return `${root}compilers/${versionId}/`;
+  }
   const base = import.meta.env.BASE_URL || "/";
   const root = base.endsWith("/") ? base : `${base}/`;
   return `${root}compilers/${versionId}/`;

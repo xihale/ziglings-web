@@ -15,7 +15,6 @@ import {
   LSPClientExtension,
 } from "@codemirror/lsp-client";
 import { zigLanguage } from "@ndim/codemirror-lang-zig";
-import { isCutDualDoc, wrapTransportForCuts } from "./cut-lsp.ts";
 // @ts-ignore
 import ZLSWorker from "./workers/zls.ts?worker";
 
@@ -99,10 +98,6 @@ const semanticTokensPlugin = ViewPlugin.fromClass(
     }
 
     startRequest(plugin: LSPPlugin, view: EditorView): void {
-      // Dual-doc cut mode: ZLS tokens are relative to the full file; mapping
-      // them onto the short display buffer is lossy. Lezer covers highlight.
-      if (isCutDualDoc()) return;
-
       if (this.pendingRequest != null) {
         // There is a pending request on an older document state that should
         // be cancelled here.
@@ -240,7 +235,7 @@ const semanticTokensEffect = StateEffect.define<DecorationSet>({});
 
 // Cut embeds: outer transport rewrites full-program content + positions.
 const zlsWorker = new ZLSWorker();
-const transport = wrapTransportForCuts(new ZlsTransport(zlsWorker));
+const transport = new ZlsTransport(zlsWorker);
 const lspClient = new LSPClient({
   highlightLanguage(name) {
     if (name == "zig") return zigLanguage;

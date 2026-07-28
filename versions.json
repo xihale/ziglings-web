@@ -1,64 +1,11 @@
 {
-  "default": "0.16.0",
+  "default": "master",
+  "assetOrigin": "https://zp.xihale.top/",
   "versions": [
-    {
-      "id": "0.16.0",
-      "label": "0.16.0",
-      "build": "in-tree",
-      "zigVersionString": "0.16.0",
-      "hostZig": "0.16.0",
-      "zig": {
-        "path": "../zig-0.16.0",
-        "git": {
-          "repo": "https://codeberg.org/ziglang/zig",
-          "ref": "0.16.0"
-        },
-        "patch": "patches/zig-0.16.0-playground-wasm.patch"
-      },
-      "zlsEntrypoint": "src/zls-0.16.zig",
-      "zls": {
-        "url": "git+https://github.com/zigtools/zls?ref=0.16.0#494486203c3a48927f2383aa3d5ce5fca112186d",
-        "hash": "zls-0.16.0-rmm5fs_JJgBG3dk5HwYK1FylE2_LMN0BYpX57tPzT-Xc"
-      }
-    },
-    {
-      "id": "0.15.2",
-      "label": "0.15.2",
-      "build": "playground",
-      "zigVersionString": "0.15.2",
-      "hostZig": "0.15.2",
-      "zig": {
-        "path": "../zig-wasm",
-        "git": {
-          "repo": "https://github.com/ziglang/zig",
-          "ref": "0.15.2"
-        },
-        "patch": "patches/zig-0.15.2-playground-wasm.patch"
-      },
-      "zls": {
-        "url": "git+https://github.com/zigtools/zls?ref=0.15.1#f91b2e1e305e5d5bd3725aea90f9f9bfb3dce055",
-        "hash": "zls-0.15.1-rmm5fgQ2JADjDh84Ja3pDBZ1io_kKdHS2YhQyvBYz66r"
-      }
-    },
     {
       "id": "master",
       "label": "master",
-      "schedule": "3d",
-      "build": "in-tree",
-      "hostZig": "master",
-      "zig": {
-        "path": "../zig-master",
-        "git": {
-          "repo": "https://codeberg.org/ziglang/zig",
-          "ref": "master"
-        },
-        "patch": "patches/zig-master-playground-wasm.patch"
-      },
-      "zlsFallbackId": "0.16.0",
-      "zls": {
-        "url": "git+https://github.com/zigtools/zls?ref=master#8da87d4f3305a550e7b739bad764e34bf1e46a08",
-        "hash": "zls-0.17.0-dev-rmm5fhsnJgACAm2dSuoMNDK6QziDk419sy5-ORvIiL0y"
-      }
+      "schedule": "3d"
     }
   ]
 }
