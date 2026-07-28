@@ -6,6 +6,8 @@
     "build": "vite build && node scripts/assemble-dist.mjs",
     "sync-ziglings": "node scripts/sync-ziglings.mjs",
     "check-catalog": "node scripts/check-catalog.mjs",
+    "smoke-verify": "node --import tsx scripts/smoke-verify.ts",
+    "check-version-alignment": "node scripts/check-version-alignment.mjs",
     "test": "node test/check-catalog.test.mjs && node --import tsx test/trim-lines.test.ts && node --import tsx test/modules.test.ts",
     "compilers": "node scripts/build-compilers.mjs",
     "compilers:stable": "node scripts/build-compilers.mjs --select stable",

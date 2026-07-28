@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { readFileSync } from "node:fs";
+import { cpSync, readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 // Site root (default). Custom domain: zp.xihale.top
@@ -71,6 +71,17 @@ export default defineConfig({
   base,
   publicDir: "public",
   plugins: [
+    {
+      name: "vendor-ziglings-to-dist",
+      // The catalog + exercise sources/patches are committed under
+      // vendor/ziglings/ (not public/) and fetched at runtime as static
+      // assets. Vite only copies public/, so mirror them into dist/ here.
+      closeBundle() {
+        const src = resolve("vendor/ziglings");
+        if (!existsSync(src)) return;
+        cpSync(src, resolve("dist/vendor/ziglings"), { recursive: true });
+      },
+    },
     {
       name: "cache-control-headers",
       configurePreviewServer(server) {

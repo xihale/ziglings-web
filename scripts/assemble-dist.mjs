@@ -40,18 +40,22 @@ if (existsSync(publicCompilers) && !existsSync(join(dist, "compilers"))) {
 }
 
 const indexHtml = readFileSync(join(dist, "index.html"), "utf8");
+// SPA fallback: GitHub Pages serves 404.html for unknown paths, so /N/ routes
+// resolve to the app shell which then reads the exercise number client-side.
 copyFileSync(join(dist, "index.html"), join(dist, "404.html"));
 
+// Per-version index.html shells (harmless for single-version; kept for parity
+// with the multi-version playground layout this project forked from).
 for (const v of versions.versions) {
   const dir = join(dist, v.id);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "index.html"), indexHtml);
   const compilerDir = join(dist, "compilers", v.id);
-  if (!existsSync(compilerDir)) {
-    console.warn(`warning: dist/compilers/${v.id} missing — site will 404 those assets`);
-  } else {
+  if (existsSync(compilerDir)) {
     const names = readdirSync(compilerDir);
     console.log(`  /${v.id}/  compilers: ${names.join(", ")}`);
+  } else if (versions.assetOrigin) {
+    console.log(`  /${v.id}/  compilers served from ${versions.assetOrigin}`);
   }
 }
 

@@ -4,18 +4,65 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Avoid overlapping deploys.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  catalog-integrity:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: true # Ziglings source; check-catalog reads committed vendor/ziglings/ though
+          submodules: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Catalog integrity
-        run: node scripts/check-catalog.mjs
-      - name: Validator unit tests
-        run: node test/check-catalog.test.mjs
+      - run: npm install
+
+      # Spec §6.4 — three invariants.
+      - name: Check 1 — catalog integrity
+        run: npm run check-catalog
+      - name: Check 2 — verification smoke (trimLines + patch + verifyRun over real content)
+        run: npm run smoke-verify
+      - name: Unit tests
+        run: npm test
+      - name: Check 3 — version alignment (catalog.zigFloor vs served compiler)
+        run: npm run check-version-alignment
+
+  build:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Build
+        run: npm run build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Deploy only on main pushes (not PRs).
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
