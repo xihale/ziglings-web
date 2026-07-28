@@ -1,15 +1,28 @@
 // Runs compiled Zig code
 
-import { WASI, PreopenDirectory, OpenFile, File } from "@bjorn3/browser_wasi_shim";
-import { stderrOutput } from "../utils";
+import { WASI, PreopenDirectory, OpenFile, File, ConsoleStdout } from "@bjorn3/browser_wasi_shim";
+import { wasi as wasi_defs } from "@bjorn3/browser_wasi_shim";
+
+/** Console fd that posts its bytes under `key` (stdout or stderr) separately. */
+function consoleOutput(key: "stdout" | "stderr"): ConsoleStdout {
+    const dec = new TextDecoder("utf-8", { fatal: false });
+    const out = new ConsoleStdout((buffer) => {
+        postMessage({ [key]: dec.decode(buffer, { stream: true }) });
+    });
+    // @ts-ignore — stub pwrite on a console-type fd (matches utils.ts shape).
+    out.fd_pwrite = (_data, _offset) => {
+        return { ret: wasi_defs.ERRNO_SPIPE, nwritten: 0 };
+    };
+    return out;
+}
 
 async function run(wasmData: BufferSource) {
     const args = ["main.wasm"];
     const env: string[] = [];
     const fds = [
         new OpenFile(new File([])), // stdin
-        stderrOutput(), // stdout
-        stderrOutput(), // stderr
+        consoleOutput("stdout"), // stdout (fd1)
+        consoleOutput("stderr"), // stderr (fd2)
         new PreopenDirectory(".", new Map([])),
     ];
     const wasi = new WASI(args, env, fds);

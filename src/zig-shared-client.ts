@@ -112,8 +112,8 @@ export class ZigSharedClient {
         if (this.sw) {
             this.sw.port.postMessage(msg);
         } else {
-            // Legacy worker takes { run: source } (no requestId).
-            this.dw!.postMessage({ run: msg.source });
+            // Legacy worker takes { run: source, mode } (no requestId).
+            this.dw!.postMessage({ run: msg.source, mode: msg.mode ?? "run" });
         }
     }
 }

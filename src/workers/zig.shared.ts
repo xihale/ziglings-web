@@ -244,6 +244,7 @@ async function doOneCompile(
     requestId: string,
     versionId: string,
     source: string,
+    mode: "run" | "test",
 ) {
     try {
         const c = compilers.get(versionId);
@@ -253,14 +254,29 @@ async function doOneCompile(
         // If superseded while waiting on assembly, drop silently.
         if (st.currentRequestId !== requestId) return;
 
-        const args = [
-            "zig.wasm",
-            "build-exe",
-            "main.zig",
-            "libcompiler_rt.a",
-            "-fno-compiler-rt",
-            "-fno-entry",
-        ];
+        // test mode: `zig test --test-no-exec -femit-bin=main.wasm` emits a
+        // WASI test-runner binary at the same path build-exe writes main.wasm,
+        // so the downstream runner reads it unchanged. Drop -fno-entry (the
+        // synthesized test runner needs _start).
+        const args =
+            mode === "test"
+                ? [
+                      "zig.wasm",
+                      "test",
+                      "main.zig",
+                      "libcompiler_rt.a",
+                      "-fno-compiler-rt",
+                      "--test-no-exec",
+                      "-femit-bin=main.wasm",
+                  ]
+                : [
+                      "zig.wasm",
+                      "build-exe",
+                      "main.zig",
+                      "libcompiler_rt.a",
+                      "-fno-compiler-rt",
+                      "-fno-entry",
+                  ];
         const env: string[] = [];
         const fds = [
             new OpenFile(new File([])),
@@ -333,7 +349,7 @@ onconnect = (ev: MessageEvent) => {
             return;
         }
         if (msg.kind === "run") {
-            const { requestId, versionId, source } = msg;
+            const { requestId, versionId, source, mode } = msg;
             st.currentRequestId = requestId; // α: supersede any prior run.
             const c = compilers.get(versionId);
             if (!c) {
@@ -347,7 +363,7 @@ onconnect = (ev: MessageEvent) => {
                 return;
             }
             c.compileChain = c.compileChain.then(() =>
-                doOneCompile(port, st, requestId, versionId, source),
+                doOneCompile(port, st, requestId, versionId, source, mode ?? "run"),
             );
             return;
         }

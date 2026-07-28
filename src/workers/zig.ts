@@ -117,7 +117,7 @@ function startWarm() {
 
 let currentlyRunning = false;
 
-async function run(source: string) {
+async function run(source: string, mode: "run" | "test") {
     if (currentlyRunning) return;
 
     currentlyRunning = true;
@@ -126,14 +126,27 @@ async function run(source: string) {
         // Caller should wait for { ready: true }; ensureReady is still the gate.
         const { libDirectory, compilerRt, zigModule } = await ensureReady();
 
-        const args = [
-            "zig.wasm",
-            "build-exe",
-            "main.zig",
-            "libcompiler_rt.a",
-            "-fno-compiler-rt", // manually linked because the self hosted webassembly backend cannot compile it by itself
-            "-fno-entry", // prevent the native webassembly backend from adding a start function to the module
-        ];
+        // test mode emits a WASI test-runner binary at the same main.wasm path
+        // (see zig.shared.ts doOneCompile for rationale).
+        const args =
+            mode === "test"
+                ? [
+                      "zig.wasm",
+                      "test",
+                      "main.zig",
+                      "libcompiler_rt.a",
+                      "-fno-compiler-rt",
+                      "--test-no-exec",
+                      "-femit-bin=main.wasm",
+                  ]
+                : [
+                      "zig.wasm",
+                      "build-exe",
+                      "main.zig",
+                      "libcompiler_rt.a",
+                      "-fno-compiler-rt", // manually linked because the self hosted webassembly backend cannot compile it by itself
+                      "-fno-entry", // prevent the native webassembly backend from adding a start function to the module
+                  ];
         const env: string[] = [];
         const fds = [
             new OpenFile(new File([])), // stdin
@@ -194,6 +207,6 @@ onmessage = (event) => {
         return;
     }
     if (event.data.run) {
-        run(event.data.run);
+        run(event.data.run, event.data.mode === "test" ? "test" : "run");
     }
 };

@@ -14,12 +14,20 @@ export type ZirCacheInfo = { files: number; bytes: number };
 /** Client → SharedWorker. */
 export type ClientMsg =
   | { kind: "init"; versionId: string }
-  | { kind: "run"; requestId: string; versionId: string; source: string };
+  | {
+        kind: "run";
+        requestId: string;
+        versionId: string;
+        source: string;
+        /** "run" = build-exe (default). "test" = zig test --test-no-exec. */
+        mode?: "run" | "test";
+    };
 
 /** SharedWorker → Client. */
 export type WorkerMsg =
   | { kind: "ready"; versionId: string; ok: true; zirCache: ZirCacheInfo | null }
   | { kind: "ready"; versionId: string; ok: false; error: string }
+  | { kind: "stdout"; requestId: string; text: string }
   | { kind: "stderr"; requestId: string; text: string }
   | { kind: "compiled"; requestId: string; wasm: ArrayBuffer }
   | { kind: "failed"; requestId: string };
