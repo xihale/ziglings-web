@@ -19,7 +19,7 @@ import {
   crosshairCursor,
 } from "@codemirror/view";
 import { formatDocument, LSPPlugin } from "@codemirror/lsp-client";
-import { history, defaultKeymap, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { history as cmHistory, defaultKeymap, historyKeymap, indentWithTab } from "@codemirror/commands";
 import {
   indentUnit,
   syntaxHighlighting,
@@ -419,7 +419,7 @@ const playgroundSetup = [
   lineNumbers(),
   highlightActiveLineGutterEmptyOnly(),
   highlightSpecialChars(),
-  history(),
+  cmHistory(),
   foldGutter({
     markerDOM(open) {
       const span = document.createElement("span");
@@ -494,6 +494,10 @@ function bootEditor(initialDoc: string): void {
       ],
     }),
   });
+  // The LSP plugin starts talking (initialize) the moment it mounts. Boot
+  // ZLS now so its worker loads and drains buffered requests before the
+  // client's request timeout fires.
+  bootZlsOnce();
 }
 
 // ─── Check button ─────────────────────────────────────────────────
