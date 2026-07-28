@@ -1,0 +1,11 @@
+--- exercises/047_methods.zig	2026-06-21 16:11:59.110876971 +0200
++++ answers/047_methods.zig	2026-06-21 16:13:07.066363558 +0200
+@@ -106,7 +106,7 @@
+         for (&aliens) |*alien| {
+ 
+             // *** Zap the alien with the heat ray here! ***
+-            ???.zap(???);
++            heat_ray.zap(alien);
+ 
+             // If the alien's health is still above 0, it's still alive.
+             if (alien.health > 0) aliens_alive += 1;

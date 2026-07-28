@@ -1,0 +1,32 @@
+--- exercises/082_anonymous_structs3.zig	2026-06-01 15:59:11.872467805 +0200
++++ answers/082_anonymous_structs3.zig	2026-06-01 15:58:38.004730144 +0200
+@@ -82,17 +82,17 @@
+     //         @typeInfo(Circle).@"struct".field_types
+     //
+     // This will be an array of field types.
+-    const field_types = ???;
++    const field_types = @typeInfo(@TypeOf(tuple)).@"struct".field_types;
+ 
+     // This will be an array of field names.
+-    const field_names = ???;
++    const field_names = @typeInfo(@TypeOf(tuple)).@"struct".field_names;
+ 
+     // 2. Loop through each field. This must be done at compile
+     // time.
+     //
+     //     Hint: remember 'inline' loops?
+     //
+-    for (???, ???) |???, ???| {
++    inline for (field_types, field_names) |field_type, field_name| {
+         // 3. Print the field's name, type, and value.
+         //
+         //     You'll need this builtin:
+@@ -116,7 +116,7 @@
+         print("\"{s}\"({any}):{any} ", .{
+             field_name,
+             field_type,
+-            ???,
++            @field(tuple, field_name),
+         });
+     }
+ }
