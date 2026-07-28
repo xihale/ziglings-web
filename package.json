@@ -1,9 +1,11 @@
 {
-  "name": "playground",
+  "name": "ziglings-web",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/assemble-dist.mjs",
+    "sync-ziglings": "node scripts/sync-ziglings.mjs",
+    "check-catalog": "node scripts/check-catalog.mjs",
     "compilers": "node scripts/build-compilers.mjs",
     "compilers:stable": "node scripts/build-compilers.mjs --select stable",
     "compilers:scheduled": "node scripts/build-compilers.mjs --select scheduled",
