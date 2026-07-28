@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  catalog-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true # Ziglings source; check-catalog reads committed vendor/ziglings/ though
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Catalog integrity
+        run: node scripts/check-catalog.mjs
+      - name: Validator unit tests
+        run: node test/check-catalog.test.mjs
