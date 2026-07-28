@@ -6,6 +6,7 @@
     "build": "vite build && node scripts/assemble-dist.mjs",
     "sync-ziglings": "node scripts/sync-ziglings.mjs",
     "check-catalog": "node scripts/check-catalog.mjs",
+    "test": "node test/check-catalog.test.mjs && node --import tsx test/trim-lines.test.ts",
     "compilers": "node scripts/build-compilers.mjs",
     "compilers:stable": "node scripts/build-compilers.mjs --select stable",
     "compilers:scheduled": "node scripts/build-compilers.mjs --select scheduled",
@@ -28,6 +29,7 @@
     "vscode-languageserver-protocol": "^3.17.3"
   },
   "devDependencies": {
+    "tsx": "^4.23.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.4"
   }
