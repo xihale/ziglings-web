@@ -1,4 +1,4 @@
-// Ziglings Web — course shell.
+// Ziglings — course shell.
 //
 // Single-page app: exercise list (left) + editor (center) + verdict
 // (right) + raw output (bottom). Routes by exercise number (/N/). Reuses the
@@ -349,7 +349,7 @@ function setRunState(state: RunState): void {
   else if (state === "err") runBtn.title = "Failed";
   else if (runMode === "next") runBtn.title = "Next exercise";
   else if (state === "ok") runBtn.title = "Passed";
-  else runBtn.title = "Run (⌘S / ⌘↵)";
+  else runBtn.title = "Run (⌘S)";
 }
 /** Flip the top-bar button into "Next" mode after a pass. */
 function setRunNext(): void {
@@ -914,6 +914,9 @@ document.addEventListener("keydown", (e) => {
 function applySidebarCollapsed(): void {
   const collapsed = loadSidebarCollapsed();
   sidebarEl.classList.toggle("collapsed", collapsed);
+  // Keep <html> in sync with the inline head script that set the initial
+  // state before first paint — both class hooks drive the same CSS rules.
+  document.documentElement.classList.toggle("sidebar-collapsed", collapsed);
   sidebarToggleEl.textContent = collapsed ? "›" : "‹";
   sidebarToggleEl.setAttribute(
     "aria-label",

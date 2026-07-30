@@ -1056,7 +1056,8 @@ kbd {
     transition: width 160ms var(--ease-out, ease-out), flex-basis 160ms var(--ease-out, ease-out);
 }
 body.resizing .pane-list { transition: none; }
-.pane-list.collapsed {
+.pane-list.collapsed,
+html.sidebar-collapsed .pane-list {
     --sidebar-width: 2rem;
 }
 /* Scroll the list, keep the toggle pinned above. The scrollbar reserves a
@@ -1085,7 +1086,8 @@ body.resizing .pane-list { transition: none; }
     transition: color 120ms;
     z-index: 2;
 }
-.pane-list.collapsed #sidebar-toggle {
+.pane-list.collapsed #sidebar-toggle,
+html.sidebar-collapsed #sidebar-toggle {
     justify-content: center;         /* chevron centered in the narrow column */
     padding-right: 0;
 }
@@ -1154,7 +1156,8 @@ body.resizing .pane-list { transition: none; }
     padding: 0.45rem 0;
 }
 /* display:none (not width:0) so the dot is the sole flex item and truly centers. */
-.pane-list.collapsed .ex-label { display: none; }
+.pane-list.collapsed .ex-label,
+html.sidebar-collapsed .ex-label { display: none; }
 
 /* ─── Context pane: verdict (top) + output (mid) + status bar (bottom) ─
    One padding, one type ramp, one voice. The verdict is a quiet status line
