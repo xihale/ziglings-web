@@ -4,65 +4,82 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ziglings Web</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap">
     <link rel="stylesheet" href="style/style.css">
 </head>
 <body>
     <header class="topbar">
         <div class="topbar-left">
             <strong>Ziglings Web</strong>
-            <span id="current-exercise" class="current-exercise"></span>
-        </div>
-        <div class="topbar-center">
-            <div class="progress-wrap">
-                <span id="progress-count">0/0</span>
-                <div class="progress-track"><div id="progress-fill"></div></div>
-            </div>
         </div>
         <div class="topbar-right">
-            <button type="button" id="export">Export</button>
-            <button type="button" id="import">Import</button>
+            <select id="exercise-select" aria-label="Exercise"></select>
+            <button type="button" id="run" disabled><span class="run-spinner" aria-hidden="true"></span>Run</button>
+            <div class="settings-menu">
+                <button type="button" id="settings-toggle" aria-label="Settings" aria-haspopup="dialog">⚙</button>
+            </div>
         </div>
     </header>
 
     <main class="shell">
-        <aside class="pane pane-list">
+        <aside class="pane pane-list" id="sidebar">
+            <button type="button" id="sidebar-toggle" aria-label="Toggle exercise list"></button>
             <nav id="exercise-list" aria-label="Exercises"></nav>
         </aside>
 
+        <div class="resizer" data-resize="sidebar" role="separator" aria-label="Resize sidebar"></div>
+
         <section class="pane pane-editor">
             <div id="editor"></div>
+            <div class="resizer resizer-v" data-resize="solution" role="separator" aria-label="Resize solution" hidden></div>
+            <div id="solution-editor" hidden></div>
         </section>
 
+        <div class="resizer" data-resize="context" role="separator" aria-label="Resize context"></div>
+
         <aside class="pane pane-context">
-            <div class="context-section">
-                <h2>Problem</h2>
-                <div id="problem-body"></div>
-                <div id="exercise-meta" class="meta"></div>
-            </div>
-            <hr>
-            <div class="context-section">
+            <div class="context-verdict">
                 <div id="verdict" class="verdict-box"></div>
-                <div class="verdict-actions">
-                    <button type="button" id="hint" hidden>Show hint</button>
-                    <button type="button" id="reveal" hidden>Show official solution</button>
-                </div>
-                <div class="check-row">
-                    <button type="button" id="check">Check</button>
-                    <button type="button" id="next" hidden>Next →</button>
-                </div>
             </div>
+            <section class="output-pane">
+                <div id="output-pad"></div>
+            </section>
         </aside>
     </main>
 
-    <section class="output-pane">
-        <div class="output-header">Output</div>
-        <div id="output-pad"></div>
-    </section>
-
-    <footer class="attribution">
-        Content © Ziglings contributors · Source: codeberg.org/ziglings/exercises
-    </footer>
-
+    <div id="settings-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="modal-backdrop" data-close></div>
+        <div class="modal-panel">
+            <header class="modal-head">
+                <h2 id="settings-title">⚙ Settings</h2>
+                <button type="button" class="modal-close" data-close aria-label="Close">✕</button>
+            </header>
+            <div class="modal-body">
+                <section class="modal-sec">
+                    <h3>Progress</h3>
+                    <button type="button" id="export">Export progress</button>
+                    <button type="button" id="import">Import progress</button>
+                </section>
+                <section class="modal-sec">
+                    <h3>Shortcuts</h3>
+                    <div class="shortcut-list">
+                        <div><kbd>⌘S</kbd><span class="shortcut-desc">Save &amp; run</span></div>
+                        <div><kbd>⌘↵</kbd><span class="shortcut-desc">Run</span></div>
+                    </div>
+                </section>
+                <section class="modal-sec">
+                    <h3>About</h3>
+                    <p class="modal-row"><span>Source</span>
+                        <a href="https://github.com/xihale/ziglings-web" target="_blank" rel="noopener">github.com/xihale/ziglings-web</a></p>
+                    <p class="modal-row"><span>Exercises</span>
+                        <a href="https://codeberg.org/ziglings/exercises" target="_blank" rel="noopener">codeberg.org/ziglings/exercises</a></p>
+                    <p class="modal-row"><span>License</span><span>MIT</span></p>
+                </section>
+            </div>
+        </div>
+    </div>
     <script src="/src/shell.ts" type="module"></script>
 </body>
 </html>

@@ -1,18 +1,22 @@
 // Progress + draft persistence in localStorage. Two keys (spec §5.1):
-//   ziglings:progress  → { version, ziglingsCommit, solved: { [slug]: ISO } }
+//   ziglings:progress  → { version, ziglingsCommit, solved: { [slug]: ISO }, failed: { [slug]: ISO } }
 //   ziglings:drafts    → { version, drafts: { [slug]: sourceString } }
 //
-// Solved-flag is keyed by slug (stable cross-version) so a Ziglings bump needs
-// no migration table (§5.6). Drafts are plain strings; only edited exercises
-// get an entry (lazy).
+// Solved/failed flags are keyed by slug (stable cross-version) so a Ziglings
+// bump needs no migration table (§5.6). Drafts are plain strings; only edited
+// exercises get an entry (lazy).
+//
+// version 2 added `failed` (additive — loadProgress backfills it to {} for old
+// blobs, so existing users see no change).
 
 const PROGRESS_KEY = "ziglings:progress";
 const DRAFTS_KEY = "ziglings:drafts";
 
 export interface Progress {
-    version: 1;
+    version: 2;
     ziglingsCommit: string;
     solved: Record<string, string>; // slug → ISO timestamp
+    failed: Record<string, string>; // slug → ISO timestamp (last attempt failed)
 }
 
 export interface Drafts {
@@ -20,7 +24,7 @@ export interface Drafts {
     drafts: Record<string, string>; // slug → source
 }
 
-const EMPTY_PROGRESS: Progress = { version: 1, ziglingsCommit: "", solved: {} };
+const EMPTY_PROGRESS: Progress = { version: 2, ziglingsCommit: "", solved: {}, failed: {} };
 const EMPTY_DRAFTS: Drafts = { version: 1, drafts: {} };
 
 function readJSON<T>(key: string, fallback: T): T {
@@ -43,8 +47,15 @@ function writeJSON(key: string, value: unknown): void {
 
 // ─── Progress ─────────────────────────────────────────────────────
 
+/** Load + additive migrate: backfill `failed` for v1 blobs. */
 export function loadProgress(): Progress {
-    return readJSON<Progress>(PROGRESS_KEY, EMPTY_PROGRESS);
+    const raw = readJSON<Partial<Progress>>(PROGRESS_KEY, EMPTY_PROGRESS);
+    return {
+        version: 2,
+        ziglingsCommit: raw.ziglingsCommit ?? "",
+        solved: raw.solved ?? {},
+        failed: raw.failed ?? {},
+    };
 }
 
 export function saveProgress(p: Progress): void {
@@ -55,12 +66,28 @@ export function isSolved(p: Progress, slug: string): boolean {
     return Object.prototype.hasOwnProperty.call(p.solved, slug);
 }
 
-/** Mark a slug solved (idempotent — timestamp updates only if not already solved). */
+export function isFailed(p: Progress, slug: string): boolean {
+    return Object.prototype.hasOwnProperty.call(p.failed, slug);
+}
+
+/** Mark a slug solved; also clears any prior failed flag (solved wins). */
 export function markSolved(p: Progress, slug: string): Progress {
-    if (isSolved(p, slug)) return p;
+    if (isSolved(p, slug) && !isFailed(p, slug)) return p;
+    const { [slug]: _drop, ...restFailed } = p.failed;
     const next: Progress = {
         ...p,
         solved: { ...p.solved, [slug]: new Date().toISOString() },
+        failed: restFailed,
+    };
+    saveProgress(next);
+    return next;
+}
+
+/** Mark a slug failed (idempotent — timestamp updates each failed attempt). */
+export function markFailed(p: Progress, slug: string): Progress {
+    const next: Progress = {
+        ...p,
+        failed: { ...p.failed, [slug]: new Date().toISOString() },
     };
     saveProgress(next);
     return next;
@@ -132,9 +159,15 @@ export function importBundle(
         throw new Error("not a ziglings-progress export (format mismatch)");
     }
     const backup = buildExport(currentProgress, currentDrafts);
+    // Accept v1 (no failed) and v2 blobs alike — additive migration.
     const progress: Progress =
-        b.progress && b.progress.version === 1
-            ? { version: 1, ziglingsCommit: b.progress.ziglingsCommit ?? "", solved: b.progress.solved ?? {} }
+        b.progress
+            ? {
+                  version: 2,
+                  ziglingsCommit: b.progress.ziglingsCommit ?? "",
+                  solved: b.progress.solved ?? {},
+                  failed: b.progress.failed ?? {},
+              }
             : EMPTY_PROGRESS;
     const drafts: Drafts =
         b.drafts && b.drafts.version === 1

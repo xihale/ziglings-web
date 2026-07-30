@@ -73,6 +73,15 @@ test("problem: renders paragraphs and inline code", () => {
     if (!html.includes("<p>") || !html.includes("Second paragraph.")) throw new Error("missing paragraph");
 });
 
+test("problem: line breaks within a paragraph become <br>, not escaped", () => {
+    const html = renderProblem("Line one.\nLine two with `code`.");
+    // The literal <br> must survive (must not be escaped to &lt;br&gt;).
+    if (!html.includes("<br>")) throw new Error("missing <br>");
+    if (html.includes("&lt;br&gt;")) throw new Error("<br> was escaped");
+    // Inline code still works on multi-line paragraphs.
+    if (!html.includes("<code>code</code>")) throw new Error("missing inline code");
+});
+
 test("problem: renders bullet list", () => {
     const html = renderProblem("- one\n- two\n- three");
     if (!html.includes("<ul>") || !html.includes("<li>one</li>")) throw new Error("bullet list not rendered");

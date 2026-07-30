@@ -1,6 +1,6 @@
 // Ziglings Web — course shell.
 //
-// Single-page app: exercise list (left) + editor (center) + problem & verdict
+// Single-page app: exercise list (left) + editor (center) + verdict
 // (right) + raw output (bottom). Routes by exercise number (/N/). Reuses the
 // forked playground's CodeMirror + ZLS + compile/runner workers, replacing the
 // playground's editor.ts entirely.
@@ -52,15 +52,14 @@ import type { WorkerMsg } from "./shared-protocol";
 import RunnerWorker from "./workers/runner.ts?worker";
 
 import {
-  loadCatalog, byNumber, ordered, runnableCount, loadSource, loadPatch,
+  loadCatalog, byNumber, ordered, loadSource, loadPatch,
 } from "./catalog.ts";
 import type { Catalog } from "./catalog.ts";
 import type { Exercise } from "./verify.ts";
 import { verifyRun, type Verdict, type RunResult } from "./verify.ts";
-import { extractProblemBody, renderProblem } from "./problem.ts";
 import { applyPatch } from "./patch.ts";
 import {
-  loadProgress, loadDrafts, markSolved, isSolved, solvedCount,
+  loadProgress, loadDrafts, markSolved, markFailed, isSolved, isFailed,
   getDraft, setDraft, buildExport, exportFilename, importBundle,
   type Progress, type Drafts,
 } from "./storage.ts";
@@ -77,25 +76,160 @@ let progress: Progress;
 let drafts: Drafts;
 let current: Exercise | null = null;
 let editor: EditorView;
+// Second editor instance for the official solution (revealed on demand after
+// a pass). Hidden until revealSolution() boots it.
+let solutionEditor: EditorView | null = null;
+let solutionRevealed = false;
 
-// Check-flow state machine: idle → checking → verdict → idle.
-type CheckState = "idle" | "checking" | "verdict";
+// Check-flow guard: idle (no check in flight) or checking.
+type CheckState = "idle" | "checking";
 let checkState: CheckState = "idle";
 
 // ─── DOM roots ────────────────────────────────────────────────────
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 const listEl = $("exercise-list");
-const progressCountEl = $("progress-count");
-const progressFillEl = $("progress-fill");
-const problemBodyEl = $("problem-body");
-const metaEl = $("exercise-meta");
+const sidebarEl = $("sidebar");
+const sidebarToggleEl = $("sidebar-toggle") as HTMLButtonElement;
+const exerciseSelectEl = $("exercise-select") as HTMLSelectElement;
+const settingsToggleEl = $("settings-toggle") as HTMLButtonElement;
+const settingsModalEl = $("settings-modal");
 const verdictEl = $("verdict");
 const outputEl = $("output-pad");
-const checkBtn = $("check") as HTMLButtonElement;
-const nextBtn = $("next") as HTMLButtonElement;
-const hintBtn = $("hint") as HTMLButtonElement;
-const revealBtn = $("reveal") as HTMLButtonElement;
-const currentLabelEl = $("current-exercise");
+const runBtn = $("run") as HTMLButtonElement;
+const solutionEditorEl = $("solution-editor");
+const solutionResizerEl = document.querySelector<HTMLElement>('[data-resize="solution"]');
+
+// Sidebar collapse persists across sessions. Default collapsed — the dot
+// column is the primary view; labels are an on-demand expansion.
+const SIDEBAR_KEY = "ziglings:sidebar-collapsed";
+function loadSidebarCollapsed(): boolean {
+  return localStorage.getItem(SIDEBAR_KEY) !== "0";
+}
+function saveSidebarCollapsed(v: boolean): void {
+  localStorage.setItem(SIDEBAR_KEY, v ? "1" : "0");
+}
+
+// ─── Pane resizers ────────────────────────────────────────────────
+// Drag the 1px hairline between panes to resize. pointerdown captures the
+// pointer so the drag survives the cursor leaving the hit area; pointermove
+// recomputes the width and writes a CSS var on :root. Direction sign:
+//   +1 → pane grows as the cursor moves right (sidebar: resizer on its right)
+//   −1 → pane grows as the cursor moves left  (context: resizer on its left)
+
+const RESIZE_KEY = "ziglings:pane-widths";
+function loadPaneWidths(): { sidebar?: number; context?: number } {
+  try { return JSON.parse(localStorage.getItem(RESIZE_KEY) ?? "{}"); }
+  catch { return {}; }
+}
+function savePaneWidths(w: { sidebar?: number; context?: number }): void {
+  localStorage.setItem(RESIZE_KEY, JSON.stringify(w));
+}
+let paneWidths = loadPaneWidths();
+// Suppress the pane width transition on first paint: without this, applying a
+// saved (narrower) width animates from the CSS default 12rem → saved value,
+// so the sidebar visibly shrinks on load. body.resizing kills the transition
+// (see .pane-list CSS); we drop it next frame once the width has settled.
+if (paneWidths.sidebar || paneWidths.context) document.body.classList.add("resizing");
+if (paneWidths.sidebar) document.documentElement.style.setProperty("--sidebar-width", `${paneWidths.sidebar}px`);
+if (paneWidths.context) document.documentElement.style.setProperty("--context-width", `${paneWidths.context}px`);
+requestAnimationFrame(() => requestAnimationFrame(() =>
+  document.body.classList.remove("resizing")));
+
+/** px resizer: writes a px width. `dir` flips which way drag grows the pane. */
+function initPxResizer(
+  resizer: HTMLElement,
+  dir: 1 | -1,
+  cssVar: string,
+  start: () => number,
+  clamp: (v: number) => number,
+  onCommit?: (v: number) => void,
+): void {
+  resizer.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    resizer.setPointerCapture(e.pointerId);
+    resizer.classList.add("dragging");
+    document.body.classList.add("resizing");   // suppress pane width transition
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    const startX = e.clientX;
+    const startV = start();
+    const onMove = (ev: PointerEvent) => {
+      const next = clamp(startV + dir * (ev.clientX - startX));
+      document.documentElement.style.setProperty(cssVar, `${next}px`);
+    };
+    const onUp = () => {
+      resizer.releasePointerCapture(e.pointerId);
+      resizer.classList.remove("dragging");
+      document.body.classList.remove("resizing");
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      const final = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(cssVar)) || startV;
+      onCommit?.(final);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  });
+}
+
+// Sidebar resizer: drag right → wider. Inert while collapsed (fixed column).
+const sidebarResizer = document.querySelector<HTMLElement>('[data-resize="sidebar"]');
+if (sidebarResizer) {
+  initPxResizer(
+    sidebarResizer, 1, "--sidebar-width",
+    () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sidebar-width")) || 192,
+    (v) => Math.max(96, Math.min(320, v)),     // 6rem .. 20rem
+    (v) => { paneWidths.sidebar = v; savePaneWidths(paneWidths); },
+  );
+}
+
+// Context resizer: drag left → wider (resizer sits on the context's left).
+const contextResizer = document.querySelector<HTMLElement>('[data-resize="context"]');
+if (contextResizer) {
+  initPxResizer(
+    contextResizer, -1, "--context-width",
+    () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--context-width")) || 360,
+    (v) => Math.max(260, Math.min(560, v)),    // 260px .. 560px
+    (v) => { paneWidths.context = v; savePaneWidths(paneWidths); },
+  );
+}
+
+// Solution resizer: % split between editor (left) and solution (right)
+// inside .pane-editor. Drag right → editor wider.
+if (solutionResizerEl) {
+  solutionResizerEl.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    solutionResizerEl.setPointerCapture(e.pointerId);
+    solutionResizerEl.classList.add("dragging");
+    document.body.classList.add("resizing");
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    const parent = solutionResizerEl.parentElement!;
+    const parentWidth = parent.getBoundingClientRect().width;
+    const startX = e.clientX;
+    const editorEl = document.getElementById("editor")!;
+    const startPct = (editorEl.getBoundingClientRect().width / parentWidth) * 100;
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.max(25, Math.min(75, startPct + ((ev.clientX - startX) / parentWidth) * 100));
+      editorEl.style.flex = `0 0 ${next}%`;
+      (document.getElementById("solution-editor")!).style.flex = `1 1 ${100 - next}%`;
+    };
+    const onUp = () => {
+      solutionResizerEl.releasePointerCapture(e.pointerId);
+      solutionResizerEl.classList.remove("dragging");
+      document.body.classList.remove("resizing");
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  });
+}
 
 // ─── Routing: /N/ ─────────────────────────────────────────────────
 
@@ -118,64 +252,120 @@ function landingNumber(): number {
   return firstUnsolved?.number ?? ord[0]?.number ?? 1;
 }
 
-// ─── Left list rendering ──────────────────────────────────────────
-
-function statusMarker(ex: Exercise): string {
-  if (!ex.runnable) return "⊘";
-  if (isSolved(progress, ex.slug)) return "✓";
-  if (current && ex.number === current.number) return "▶";
-  return "·";
-}
+// ─── Left list rendering (status dots) ────────────────────────────
+// Dot colour: green=solved · red=failed · grey=not-runnable · white=pending.
+// The exercise prompt lives in the editor's leading comment now, so the list
+// only shows a status dot (+ label when the sidebar is expanded).
 
 function renderList(): void {
   listEl.replaceChildren();
-  const total = runnableCount(catalog);
-  const done = ordered(catalog).filter((e) => e.runnable && isSolved(progress, e.slug)).length;
-  progressCountEl.textContent = `${done}/${total}`;
-  progressFillEl.style.width = `${total === 0 ? 0 : (done / total) * 100}%`;
-
   for (const ex of ordered(catalog)) {
     const row = document.createElement("button");
     row.type = "button";
-    row.className = "ex-row";
+    row.className = "ex-dot";
     if (current && ex.number === current.number) row.classList.add("current");
     if (isSolved(progress, ex.slug)) row.classList.add("solved");
-    if (!ex.runnable) {
-      row.classList.add("not-runnable");
-      row.title = `Not runnable in-browser: ${ex.notRunnableReason ?? "unknown"}`;
-    }
-    const mark = document.createElement("span");
-    mark.className = "ex-mark";
-    mark.textContent = statusMarker(ex);
+    else if (!ex.runnable) row.classList.add("not-runnable");
+    else if (isFailed(progress, ex.slug)) row.classList.add("failed");
+    // Native title tooltip — works in both collapsed & expanded, zero JS positioning.
+    row.title = `${String(ex.number).padStart(3, "0")} ${ex.name}` +
+      (!ex.runnable ? ` (not runnable)` : "");
+
     const label = document.createElement("span");
     label.className = "ex-label";
     label.textContent = `${String(ex.number).padStart(3, "0")} ${ex.name}`;
-    row.append(mark, label);
+    row.append(label);
     row.addEventListener("click", () => openExercise(ex.number));
     listEl.appendChild(row);
   }
+  // Keep the current row in view: navigating via the top-bar <select> or
+  // browser history can land on an exercise scrolled off the visible list.
+  const cur = listEl.querySelector<HTMLElement>(".ex-dot.current");
+  cur?.scrollIntoView({ block: "nearest" });
 }
 
-// ─── Problem + verdict rendering ──────────────────────────────────
+// ─── Verdict rendering ────────────────────────────────────────────
+// A verdict is a small declarative view: a status class (for colour), a list
+// of HTML body parts, an optional follow-up action row, and an optional hint.
+// Everything renders through renderVerdict(), so follow-ups (Hint, Reveal,
+// Next) always travel together — no innerHTML string-concat that silently
+// drops the buttons it just rendered (the bug this replaces had).
 
-function renderProblem(ex: Exercise, source: string): void {
-  const body = extractProblemBody(source);
-  problemBodyEl.innerHTML = body ? renderProblem(body) : '<p class="muted">(This exercise has no leading comment body.)</p>';
-  const kindLabel = ex.kind === "test" ? "test" : "exe";
-  const streamLabel = ex.checkStdout ? "stdout" : "stderr";
-  metaEl.innerHTML =
-    `kind: <code>${kindLabel}</code> · expected on <code>${streamLabel}</code>` +
-    (ex.runnable ? "" : ` · <strong class="warn">not runnable</strong>`);
-}
+type VerdictAction = { label: string; fn: () => void };
+type VerdictView = { cls?: string; parts?: string[]; actions?: VerdictAction[]; hint?: string };
 
-function setVerdict(html: string, cls = ""): void {
-  verdictEl.className = `verdict-box ${cls}`;
-  verdictEl.innerHTML = html;
+// The last view handed to renderVerdict. showHint() re-emits it with a hint
+// folded in, so actions (Next, Reveal) survive — no DOM-scraping rebuild.
+let lastVerdict: VerdictView = {};
+
+function renderVerdict(v: VerdictView): void {
+  lastVerdict = v;
+  verdictEl.className = `verdict-box ${v.cls ?? ""}`;
+  const frag = document.createDocumentFragment();
+  for (const html of v.parts ?? []) {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    frag.append(...wrap.childNodes);
+  }
+  if (v.hint) {
+    const h = document.createElement("div");
+    h.className = "hint";
+    h.innerHTML = `<strong>Hint:</strong> ${esc(v.hint)}`;
+    frag.append(h);
+  }
+  if (v.actions && v.actions.length > 0) {
+    const row = document.createElement("div");
+    row.className = "verdict-actions";
+    for (const a of v.actions) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = a.label;
+      b.addEventListener("click", a.fn);
+      row.append(b);
+    }
+    frag.append(row);
+  }
+  verdictEl.replaceChildren(frag);
 }
 
 function clearVerdict(): void {
+  lastVerdict = {};
   verdictEl.className = "verdict-box";
-  verdictEl.innerHTML = "";
+  verdictEl.replaceChildren();
+}
+
+// Run button reflects the check state machine: idle (ready) / busy
+// (yellow + spinner) / ok (green) / err (red). A `disabled` runBtn stays
+// dimmed for not-runnable exercises regardless of state class.
+// On pass, the button flips to "Next" mode (still green) whose verb is
+// goNext(); openExercise / a new run flips it back to Run.
+type RunState = "idle" | "busy" | "ok" | "err";
+let runMode: "run" | "next" = "run";
+function setRunState(state: RunState): void {
+  runBtn.classList.toggle("busy", state === "busy");
+  runBtn.classList.toggle("ok", state === "ok");
+  runBtn.classList.toggle("err", state === "err");
+  if (state === "busy") runBtn.title = "Running…";
+  else if (state === "err") runBtn.title = "Failed";
+  else if (runMode === "next") runBtn.title = "Next exercise";
+  else if (state === "ok") runBtn.title = "Passed";
+  else runBtn.title = "Run (⌘S / ⌘↵)";
+}
+/** Flip the top-bar button into "Next" mode after a pass. */
+function setRunNext(): void {
+  runMode = "next";
+  runBtn.replaceChildren(document.createTextNode("Next"));
+  runBtn.title = "Next exercise";
+}
+/** Restore the button to its normal "Run" verb (called on openExercise).
+ *  Rebuilds the spinner span that the busy state animates. */
+function resetRunMode(): void {
+  if (runMode === "run") return;
+  runMode = "run";
+  const spinner = document.createElement("span");
+  spinner.className = "run-spinner";
+  spinner.setAttribute("aria-hidden", "true");
+  runBtn.replaceChildren(spinner, document.createTextNode("Run"));
 }
 
 /** Line-by-line diff for output_mismatch. */
@@ -210,8 +400,6 @@ let zlsBooted = false;
 
 // In-flight check state.
 let checkGen = 0;
-let pendingRunResult: Partial<RunResult> = {};
-let lastWasm: ArrayBuffer | null = null;
 
 function bootZlsOnce(): void {
   if (zlsBooted) return;
@@ -233,9 +421,10 @@ function onZigWorkerMessage(msg: WorkerMsg): void {
     if (msg.ok) {
       compilerReady = true;
     } else {
-      setVerdict(`<p class="err">Compiler failed to load: ${esc(msg.error)}</p>`, "err");
+      renderVerdict({ cls: "err", parts: [`<p class="err">Compiler failed to load: ${esc(msg.error)}</p>`] });
       checkState = "idle";
-      checkBtn.disabled = false;
+      runBtn.disabled = current ? !current.runnable : false;
+      setRunState("err");
     }
     return;
   }
@@ -266,7 +455,6 @@ function onZigWorkerMessage(msg: WorkerMsg): void {
 
   if (msg.kind === "compiled") {
     if (msg.requestId !== String(gen)) return;
-    lastWasm = msg.wasm;
     runCompiled(msg.wasm, gen);
     return;
   }
@@ -314,30 +502,53 @@ function runCompiled(wasm: ArrayBuffer, gen: number): void {
   };
 }
 
+/** The pass verdict: just "Passed". The official solution auto-reveals
+ *  beside the learner's code (finishCheck calls revealSolution()), so there's
+ *  no follow-up button — navigation is via the sidebar / top-bar <select>. */
+function renderPassVerdict(): void {
+  renderVerdict({
+    cls: "pass",
+    parts: [`<p class="pass">Passed</p>`],
+  });
+}
+
 function finishCheck(v: Verdict): void {
-  checkState = "verdict";
-  checkBtn.disabled = false;
+  checkState = "idle";
+  runBtn.disabled = current ? !current.runnable : false;
   if (v.status === "pass" && current) {
-    progress = markSolved(progress, current.slug);
+    progress = markSolved(progress, current.slug); // also clears failed
     renderList();
-    setVerdict(
-      `<p class="pass">✓ Passed</p>` +
-      `<div class="verdict-actions"><button id="next-action">Next →</button></div>`,
-      "pass",
-    );
-    $("next-action").addEventListener("click", goNext);
-    nextBtn.hidden = false;
-  } else if (v.failKind === "compile") {
-    setVerdict(`<p class="err">✗ Compile error</p><p class="muted">Read the compiler output above — that's the exercise.</p>`, "err");
-  } else if (v.failKind === "run") {
-    const label = current?.kind === "test" ? "Tests failed" : "Run failed";
-    setVerdict(`<p class="err">✗ ${label} (exit ${v.exitCode ?? "?"})</p>`, "err");
-  } else if (v.failKind === "output_mismatch" && v.expected !== undefined && v.actual !== undefined) {
-    setVerdict(
-      `<p class="err">✗ Output mismatch</p>` +
-      renderDiff(v.expected, v.actual),
-      "err",
-    );
+    renderPassVerdict();
+    revealSolution();   // auto-show the official solution beside the code
+    setRunState("ok");
+    setRunNext();       // the Run button becomes "Next"
+  } else if (v.status === "fail" && current) {
+    progress = markFailed(progress, current.slug); // dot turns red
+    renderList();
+    if (v.failKind === "compile") {
+      renderVerdict({
+        cls: "err",
+        parts: [
+          `<p class="err">Compile error</p>`,
+          `<p class="muted">Read the compiler output below — that's the exercise.</p>`,
+        ],
+        actions: current.hint ? [{ label: "Hint", fn: showHint }] : [],
+      });
+    } else if (v.failKind === "run") {
+      const label = current.kind === "test" ? "Tests failed" : "Run failed";
+      renderVerdict({
+        cls: "err",
+        parts: [`<p class="err">${label} (exit ${v.exitCode ?? "?"})</p>`],
+        actions: current.hint ? [{ label: "Hint", fn: showHint }] : [],
+      });
+    } else if (v.failKind === "output_mismatch" && v.expected !== undefined && v.actual !== undefined) {
+      renderVerdict({
+        cls: "err",
+        parts: [`<p class="err">Output mismatch</p>`, renderDiff(v.expected, v.actual)],
+        actions: current.hint ? [{ label: "Hint", fn: showHint }] : [],
+      });
+    }
+    setRunState("err");
   }
 }
 
@@ -366,13 +577,16 @@ async function openExercise(n: number): void {
   if (!ex) return;
   current = ex;
   setRoute(n);
-  currentLabelEl.textContent = `${String(ex.number).padStart(3, "0")} ${ex.name}`;
+  exerciseSelectEl.value = String(ex.number);
   clearOutput();
   clearVerdict();
-  nextBtn.hidden = true;
-  hintBtn.hidden = !ex.hint;
-  revealBtn.hidden = true;
-  checkBtn.disabled = !ex.runnable;
+  hideSolution();   // new exercise closes any revealed solution
+  runBtn.disabled = !ex.runnable;
+  // New exercise resets the check state machine to idle and the button
+  // back to its "Run" verb (it may have become "Next" on the previous pass).
+  checkState = "idle";
+  resetRunMode();
+  setRunState("idle");
 
   // Source: draft if any, else the broken initial source.
   let source = getDraft(drafts, ex.slug);
@@ -380,21 +594,22 @@ async function openExercise(n: number): void {
     try {
       source = await loadSource(ex);
     } catch (err) {
-      setVerdict(`<p class="err">Failed to load source: ${esc(String(err))}</p>`, "err");
+      renderVerdict({ cls: "err", parts: [`<p class="err">Failed to load source: ${esc(String(err))}</p>`] });
       return;
     }
   }
 
-  renderProblem(ex, source);
   replaceDoc(source);
 
   if (!ex.runnable) {
-    setVerdict(
-      `<p class="banner">This exercise needs a local Zig environment` +
-      ` (reason: <code>${ex.notRunnableReason ?? "unknown"}</code>).` +
-      ` Complete it locally via <code>git clone</code> of Ziglings.</p>`,
-      "banner",
-    );
+    renderVerdict({
+      cls: "banner",
+      parts: [
+        `<p class="banner">This exercise needs a local Zig environment` +
+        ` (reason: <code>${ex.notRunnableReason ?? "unknown"}</code>).` +
+        ` Complete it locally via <code>git clone</code> of Ziglings.</p>`,
+      ],
+    });
   }
 
   renderList();
@@ -482,8 +697,7 @@ function bootEditor(initialDoc: string): void {
         indentUnit.of("    "),
         keymap.of([
           indentWithTab,
-          { key: "Mod-s", preventDefault: true, run: (v) => { formatDocument(v); return true; } },
-          { key: "Mod-Enter", run: () => { startCheck(); return true; } },
+          { key: "Mod-s", preventDefault: true, run: (v) => { formatDocument(v); startCheck(); return true; } },
         ]),
         zigLanguage,
         syntaxHighlighting(highlightStyle),
@@ -507,18 +721,16 @@ function startCheck(): void {
   if (checkState === "checking") return;
   checkState = "checking";
   checkGen += 1;
-  pendingRunResult = {};
   clearOutput();
   clearVerdict();
-  nextBtn.hidden = true;
-  hintBtn.hidden = !current.hint;
-  revealBtn.hidden = true;
-  checkBtn.disabled = true;
+  hideSolution();
+  runBtn.disabled = true;
+  setRunState("busy");
 
   if (!workersBooted) bootWorkersOnce();
 
   if (!compilerReady) {
-    setVerdict(`<p class="muted">Loading compiler…</p>`, "loading");
+    renderVerdict({ cls: "loading", parts: [`<p class="muted">Loading compiler…</p>`] });
     // Queue: retry once ready.
     const wait = setInterval(() => {
       if (compilerReady) {
@@ -533,7 +745,7 @@ function startCheck(): void {
 
 function dispatchCompile(): void {
   if (!current) return;
-  setVerdict(`<p class="muted">Checking…</p>`, "loading");
+  renderVerdict({ cls: "loading", parts: [`<p class="muted">Checking…</p>`] });
   zigWorker!.dispatch({
     kind: "run",
     requestId: String(checkGen),
@@ -543,32 +755,71 @@ function dispatchCompile(): void {
   });
 }
 
-// ─── Hint / reveal ────────────────────────────────────────────────
+// ─── Verdict follow-up actions (hint / reveal / next) ────────────
+// These live inside the verdict itself — they only make sense as a
+// follow-up to a verdict, not as persistent chrome. renderVerdict()
+// wires them as a button row beneath the status line.
 
-hintBtn.addEventListener("click", () => {
+/** Re-render the last verdict with the hint folded in. The Hint action
+ *  itself is dropped — once the hint is visible the button is pointless,
+ *  and re-emitting it produced a second "dead" Hint button that did nothing
+ *  when clicked (the view was already in its hint-shown state). Other
+ *  follow-up actions (Next, Reveal) are preserved. */
+function showHint(): void {
   if (!current?.hint) return;
-  setVerdict(
-    (verdictEl.innerHTML ? verdictEl.innerHTML + "<hr>" : "") +
-    `<div class="hint"><strong>Hint:</strong> ${esc(current.hint)}</div>`,
-  );
-});
+  const { actions, ...rest } = lastVerdict;
+  const keep = (actions ?? []).filter((a) => a.label !== "Hint");
+  renderVerdict({ ...rest, hint: current.hint, ...(keep.length ? { actions: keep } : {}) });
+}
 
-revealBtn.addEventListener("click", async () => {
-  if (!current) return;
+/** Reveal the official-solution editor beside the learner's code. Loads the
+ *  healed source on first reveal; the editor is then kept around (read-only). */
+async function revealSolution(): Promise<void> {
+  if (!current || solutionRevealed) return;
+  let healed: string;
   try {
     const [broken, patch] = await Promise.all([loadSource(current), loadPatch(current)]);
-    const healed = applyPatch(broken, patch);
-    setVerdict(
-      `<p class="muted">Official solution (revealed — you already passed):</p>` +
-      `<pre class="healed">${esc(healed)}</pre>`,
-    );
+    healed = applyPatch(broken, patch);
   } catch (err) {
-    setVerdict(`<p class="err">Failed to load official solution: ${esc(String(err))}</p>`, "err");
+    renderVerdict({ cls: "err", parts: [`<p class="err">Failed to load official solution: ${esc(String(err))}</p>`] });
+    return;
   }
-});
+  if (!solutionEditor) bootSolutionEditor();
+  solutionEditor!.dispatch({ changes: { from: 0, to: solutionEditor!.state.doc.length, insert: healed } });
+  solutionEditorEl.hidden = false;
+  if (solutionResizerEl) solutionResizerEl.hidden = false;
+  solutionRevealed = true;
+}
 
-nextBtn.addEventListener("click", goNext);
-checkBtn.addEventListener("click", startCheck);
+/** Hide the solution editor + resizer (used when switching exercises). */
+function hideSolution(): void {
+  if (solutionEditorEl) solutionEditorEl.hidden = true;
+  if (solutionResizerEl) solutionResizerEl.hidden = true;
+  solutionRevealed = false;
+}
+
+function bootSolutionEditor(): void {
+  solutionEditor = new EditorView({
+    parent: solutionEditorEl,
+    state: EditorState.create({
+      doc: "",
+      extensions: [
+        playgroundSetup,
+        editorTheme,
+        indentUnit.of("    "),
+        EditorState.readOnly.of(true),
+        zigLanguage,
+        syntaxHighlighting(highlightStyle),
+      ],
+    }),
+  });
+}
+
+// The top-bar verb button: Run by default, but "Next" after a pass.
+runBtn.addEventListener("click", () => {
+  if (runMode === "next") goNext();
+  else startCheck();
+});
 
 // ─── Export / Import ──────────────────────────────────────────────
 
@@ -605,12 +856,74 @@ $("import").addEventListener("click", () => {
       downloadJSON(`ziglings-backup-${new Date().toISOString().slice(0, 10)}.json`, backup);
       renderList();
       if (current) openExercise(current.number);
-      setVerdict(`<p class="pass">Imported. A backup of your previous data was downloaded.</p>`, "pass");
+      renderVerdict({ cls: "pass", parts: [`<p class="pass">Imported. A backup of your previous data was downloaded.</p>`] });
     } catch (err) {
-      setVerdict(`<p class="err">Import failed: ${esc(String(err))}</p>`, "err");
+      renderVerdict({ cls: "err", parts: [`<p class="err">Import failed: ${esc(String(err))}</p>`] });
+    } finally {
+      closeSettings();
     }
   });
   input.click();
+});
+
+// ─── Exercise dropdown (top bar) + settings menu + sidebar collapse ─
+
+/** Populate the top-bar <select> with every exercise. Called once at boot. */
+function populateExerciseSelect(): void {
+  exerciseSelectEl.replaceChildren();
+  for (const ex of ordered(catalog)) {
+    const opt = document.createElement("option");
+    opt.value = String(ex.number);
+    opt.textContent = `${String(ex.number).padStart(3, "0")} ${ex.name}`;
+    exerciseSelectEl.appendChild(opt);
+  }
+}
+
+exerciseSelectEl.addEventListener("change", () => {
+  const n = parseInt(exerciseSelectEl.value, 10);
+  if (Number.isFinite(n) && n > 0) openExercise(n);
+});
+
+// Settings modal — open from the ⚙ segment, close on ✕ / backdrop click / Escape.
+// Focus management: opening moves focus to the close button; closing restores it
+// to the toggle so the user returns to where they entered.
+function openSettings(): void {
+  settingsModalEl.hidden = false;
+  (settingsModalEl.querySelector(".modal-close") as HTMLButtonElement | null)?.focus();
+}
+function closeSettings(): void {
+  if (settingsModalEl.hidden) return;
+  settingsModalEl.hidden = true;
+  settingsToggleEl.focus();
+}
+settingsToggleEl.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (settingsModalEl.hidden) openSettings(); else closeSettings();
+});
+settingsModalEl.addEventListener("click", (e) => {
+  if ((e.target as Element).closest("[data-close]")) closeSettings();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !settingsModalEl.hidden) closeSettings();
+});
+
+// Sidebar collapse — persisted. Toggle button flips the .collapsed class.
+// The toggle shows a direction chevron that points where the list will go:
+// ‹ when expanded (click collapses toward the left),
+// › when collapsed (click expands toward the right).
+function applySidebarCollapsed(): void {
+  const collapsed = loadSidebarCollapsed();
+  sidebarEl.classList.toggle("collapsed", collapsed);
+  sidebarToggleEl.textContent = collapsed ? "›" : "‹";
+  sidebarToggleEl.setAttribute(
+    "aria-label",
+    collapsed ? "Expand exercise list" : "Collapse exercise list",
+  );
+}
+sidebarToggleEl.addEventListener("click", () => {
+  const next = !loadSidebarCollapsed();
+  saveSidebarCollapsed(next);
+  applySidebarCollapsed();
 });
 
 // ─── Navigation events ────────────────────────────────────────────
@@ -635,11 +948,14 @@ async function boot(): Promise<void> {
   // First-visit banner (spec §5.7).
   if (!localStorage.getItem("ziglings:visited")) {
     localStorage.setItem("ziglings:visited", "1");
-    setVerdict(
-      `<p class="banner">Progress is stored in this browser only. To move devices, use Export/Import (top right).</p>`,
-      "banner",
-    );
+    renderVerdict({
+      cls: "banner",
+      parts: [`<p class="banner">Progress lives only in this browser. Move devices via Export/Import (⚙ menu).</p>`],
+    });
   }
+
+  populateExerciseSelect();
+  applySidebarCollapsed();
 
   // Boot editor with a placeholder; real doc loads on openExercise.
   bootEditor("// loading…");

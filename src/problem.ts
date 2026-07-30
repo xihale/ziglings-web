@@ -56,7 +56,9 @@ export function renderProblem(text: string): string {
                     .join("");
                 return `<ul>${items}</ul>`;
             }
-            return `<p>${inline(p.replace(/\n/g, "<br>"))}</p>`;
+            // Escape first (inline), then introduce <br> for line breaks
+            // so the injected markup isn't itself escaped.
+            return `<p>${inline(p).replace(/\n/g, "<br>")}</p>`;
         })
         .join("");
 }

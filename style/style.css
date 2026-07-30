@@ -48,8 +48,10 @@
     --autocomplete-match:       var(--zig-yellow);
 
     /* ─── Editor system (CodeMirror) ─────────────────────────────── */
-    --editor-font-mono: ui-monospace, 'SFMono-Regular', Menlo, Monaco,
-        'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    /* JetBrains Mono is loaded via Google Fonts in index.html; list it first
+       so Chrome uses it instead of falling through to ui-monospace. */
+    --editor-font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo,
+        Monaco, 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
     --editor-font-size: 16px;
     --editor-line-height: 1.55;
     --editor-code-padding-x: 12px;
@@ -62,6 +64,8 @@
     --editor-focus-ring: rgba(255, 255, 255, 0.14);
 }
 
+/* One monospace family carries the whole surface (editor, chrome, body),
+   matching the playground's bare-text language. */
 body, button, select {
     font-family: var(--editor-font-mono);
 }
@@ -70,10 +74,14 @@ body, button, select {
     box-sizing: border-box;
 }
 
-/* Thin custom scrollbar (affects editor + output panes uniformly). */
+/* Thin custom scrollbar (affects editor + output panes uniformly).
+   In Chromium, the standard `scrollbar-width: thin` property DISABLES the
+   legacy ::-webkit-scrollbar pseudo and forces a 10px rail. To get a thinner
+   6px rail we must NOT set scrollbar-width — rely on ::-webkit-scrollbar alone
+   (Chrome's native). Firefox falls back to its default, which is acceptable. */
 ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
 }
 ::-webkit-scrollbar-track {
     background: transparent;
@@ -84,10 +92,6 @@ body, button, select {
 }
 ::-webkit-scrollbar-thumb:hover {
     background: #4a4f55;
-}
-* {
-    scrollbar-width: thin;
-    scrollbar-color: var(--canvas-mid) transparent;
 }
 
 html, body {
@@ -246,83 +250,6 @@ main {
 #example-select option {
     background: var(--canvas-soft);
     color: var(--body);
-}
-
-/* Run / Reset / Share — same bare text language as the select */
-#run,
-#reset,
-#share-toggle {
-    border: none;
-    border-radius: 0;
-    padding: 0.2rem 0;
-    margin: 0;
-    height: auto;
-    font-size: 0.85rem;
-    font-weight: 400;
-    font-family: var(--editor-font-mono);
-    line-height: 1.4;
-    cursor: pointer;
-    background: transparent;
-    color: var(--body-mid);
-}
-#run:hover,
-#reset:hover,
-#share-toggle:hover,
-#share-toggle:focus-visible,
-.share-menu.open #share-toggle {
-    color: var(--ink);
-    background: transparent;
-    outline: none;
-}
-#share-toggle.share-flash {
-    color: var(--status-ok);
-}
-
-/* Share dropdown */
-.share-menu {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-}
-
-.share-dropdown {
-    /* top/right set in JS (fixed) so pane overflow does not clip. */
-    position: fixed;
-    z-index: 40;
-    min-width: 7.5rem;
-    display: flex;
-    flex-direction: column;
-    padding: 0.25rem 0;
-    background: var(--canvas-soft);
-    border: 1px solid var(--hairline-bright);
-    box-shadow: none;
-}
-
-.share-dropdown[hidden] {
-    display: none;
-}
-
-.share-dropdown button {
-    display: block;
-    width: 100%;
-    margin: 0;
-    padding: 0.4rem 0.85rem;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    color: var(--body-mid);
-    font-family: var(--editor-font-mono);
-    font-size: 0.85rem;
-    line-height: 1.4;
-    text-align: left;
-    cursor: pointer;
-}
-
-.share-dropdown button:hover,
-.share-dropdown button:focus-visible {
-    color: var(--ink);
-    background: rgba(255, 255, 255, 0.06);
-    outline: none;
 }
 
 /* ─── Run status (idle / busy yellow / exit green|red) ─────────── */
@@ -808,16 +735,37 @@ body.embed:not(.has-run) #editor-pane {
 /* ═══════════════════════════════════════════════════════════════════
    Ziglings Web shell (course layout). Appended after the playground's
    CodeMirror theme; reuses theme tokens defined at the top of this file.
+
+   Visual language mirrors the playground: one system monospace family
+   across the whole surface, bare-text controls (no borders, no radius),
+   a continuous near-black canvas joined only by 1px hairlines.
    ═══════════════════════════════════════════════════════════════════ */
 
 body {
     margin: 0;
     background: var(--canvas);
     color: var(--body);
-    font-family: system-ui, -apple-system, sans-serif;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+}
+
+/* Bare-text control baseline — every button/select shares the toolbar's
+   quiet text language (see #run/#reset in the playground). */
+button,
+select {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--body-mid);
+    font-family: var(--editor-font-mono);
+    cursor: pointer;
+}
+button:hover,
+select:hover {
+    color: var(--ink);
+    background: transparent;
+    outline: none;
 }
 
 /* ─── Top bar ───────────────────────────────────────────────────── */
@@ -825,147 +773,529 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding: 8px 16px;
+    gap: 1rem;
+    height: 2.75rem;
+    padding: 0 1rem;
     background: var(--canvas);
     border-bottom: 1px solid var(--hairline);
     flex: 0 0 auto;
 }
-.topbar-left { display: flex; align-items: baseline; gap: 12px; color: var(--ink); }
-.topbar-left strong { font-size: 15px; }
-.current-exercise { color: var(--body-mid); font-family: var(--editor-font-mono); font-size: 13px; }
-.topbar-right { display: flex; gap: 8px; }
-.topbar button {
+.topbar-left {
+    color: var(--ink);
+    font-size: 0.85rem;
+}
+.topbar-left strong { font-weight: 400; }
+/* The top-right cluster reads as one continuous strip: plain text segments
+   divided by vertical hairlines that run the full bar height. No boxed
+   buttons, no top/bottom borders — only the left/right dividers. */
+.topbar-right {
+    display: flex;
+    align-items: stretch;       /* so dividers span the full bar height */
+    align-self: stretch;        /* fill the topbar's height */
+    flex-shrink: 0;
+}
+/* The interactive segments themselves: the <select>, the Run button, and the
+   settings menu. (.settings-menu is the segment; #settings-toggle fills it.) */
+.topbar-right > *,
+.topbar-right > .settings-menu > #settings-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0 0.75rem;
+    border: none;
+    background: transparent;
+    color: var(--body-mid);
+    font-family: var(--editor-font-mono);
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 120ms;
+}
+.topbar-right > * + * { border-left: 1px solid var(--hairline); }
+.topbar-right > *:hover,
+.topbar-right > .settings-menu:hover #settings-toggle { color: var(--ink); }
+/* ⚙ is an icon glyph, not text — bigger so it reads at a glance, nudged right
+   so it sits flush against the bar's edge with no trailing whitespace.
+   Mirrors the segment selector above for specificity parity, since that
+   rule sets the baseline font-size/padding and a bare #settings-toggle
+   would lose to it. */
+.topbar-right > .settings-menu {
+    margin-right: -1rem;            /* cancel topbar's right padding so the
+                                       gear sits flush against the bar edge */
+}
+.topbar-right > .settings-menu > #settings-toggle {
+    font-size: 1.6rem;
+    padding-right: 1rem;
+}
+
+/* Exercise <select>: bare text, looks like a quiet caption. The selected
+   label is right-aligned so long titles hug the divider by Run rather than
+   leaving a ragged left gap. */
+#exercise-select {
+    max-width: 14rem;
+    text-align: right;
+    text-align-last: right;
+    color-scheme: dark;
+    -webkit-appearance: none;
+    appearance: none;
+}
+#exercise-select:focus { outline: none; }
+#exercise-select option { background: var(--canvas-soft); color: var(--body); }
+
+/* Run — a quiet text verb. State shows through colour + spinner only; no box.
+   busy=amber·ok=green·err=red, idle dims toward body-mid. */
+#run:disabled { opacity: 0.55; cursor: not-allowed; }
+#run .run-spinner { display: none; }
+#run.busy { color: var(--status-busy); cursor: default; }
+#run.busy .run-spinner {
+    display: inline-block;
+    width: 0.7rem; height: 0.7rem;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: status-spin 0.7s linear infinite;
+}
+#run.ok { color: var(--status-ok); }
+#run.err { color: var(--status-err); }
+
+/* ─── Settings modal (⚙) — centered overlay over a dimmed backdrop.
+   Same voice as the rest: canvas-soft surface, 1px hairlines, no rounding,
+   no shadow. The backdrop's brightness delta from the page is what separates
+   the panel — not a drop shadow. */
+.modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; }
+.modal[hidden] { display: none; }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); }
+.modal-panel {
+    position: relative;
     background: var(--canvas-soft);
+    border: 1px solid var(--hairline-bright);
+    min-width: 26rem;
+    max-width: min(34rem, 90vw);
+    max-height: 85vh;
+    overflow: auto;
+}
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.95rem 1.2rem;
+    border-bottom: 1px solid var(--hairline);
+}
+.modal-head h2 {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--editor-font-mono);
+    font-size: 0.95rem;
+    font-weight: 400;
+}
+.modal-close {
+    padding: 0 0.25rem;
+    color: var(--body-mid);
+    font-size: 0.95rem;
+    line-height: 1;
+}
+.modal-close:hover,
+.modal-close:focus-visible { color: var(--ink); outline: none; }
+.modal-body { display: flex; flex-direction: column; }
+.modal-sec + .modal-sec { border-top: 1px solid var(--hairline); }
+.modal-sec h3 {
+    margin: 0;
+    padding: 0.95rem 1.2rem 0.45rem;
+    color: var(--body-mid);
+    font-family: var(--editor-font-mono);
+    font-size: 0.7rem;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.modal-sec button {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0.5rem 1.2rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
     color: var(--body);
-    border: 1px solid var(--hairline);
-    padding: 5px 12px;
-    border-radius: 4px;
-    font-size: 13px;
+    font-family: var(--editor-font-mono);
+    font-size: 0.88rem;
+    line-height: 1.4;
+    text-align: left;
     cursor: pointer;
 }
-.topbar button:hover { border-color: var(--body-mid); color: var(--ink); }
+.modal-sec button:hover,
+.modal-sec button:focus-visible {
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.06);
+    outline: none;
+}
+/* Shortcuts — one entry per row: <kbd> on the left, the action after it. */
+.shortcut-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0.25rem 1.2rem 1rem;
+}
+.shortcut-list > div {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.shortcut-list kbd { flex: 0 0 auto; }
+.shortcut-list .shortcut-desc {
+    color: var(--body-mid);
+    font-family: var(--editor-font-mono);
+    font-size: 0.85rem;
+}
+kbd {
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--hairline-bright);
+    color: var(--body);
+    font-family: var(--editor-font-mono);
+    font-size: 0.78rem;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+.modal-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0;
+    padding: 0.45rem 1.2rem;
+    font-family: var(--editor-font-mono);
+    font-size: 0.88rem;
+}
+.modal-row > :first-child { color: var(--body-mid); flex: 0 0 auto; }
+.modal-row > :last-child { color: var(--body); text-align: right; overflow-wrap: anywhere; }
+.modal-row a { color: var(--body); text-decoration: none; }
+.modal-row a:hover,
+.modal-row a:focus-visible { color: var(--ink); outline: none; }
+.modal-row:last-child { padding-bottom: 1rem; }
 
-.progress-wrap { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--body-mid); }
-.progress-track { width: 160px; height: 6px; background: var(--canvas-soft); border-radius: 3px; overflow: hidden; }
-#progress-fill { height: 100%; width: 0; background: var(--status-ok); transition: width 200ms; }
-
-/* ─── Three-pane shell ──────────────────────────────────────────── */
+/* ─── Three-pane shell ────────────────────────────────────────────
+   Flex row: sidebar | resizer | editor | resizer | context. Widths are
+   driven by CSS variables that the resizer JS updates live. */
 .shell {
-    display: grid;
-    grid-template-columns: 220px 1fr 360px;
+    display: flex;
+    flex-direction: row;
     flex: 1 1 auto;
     min-height: 0;
 }
-.pane { min-height: 0; border-right: 1px solid var(--hairline); }
-.pane-list { overflow-y: auto; }
-.pane-editor { border-right: 1px solid var(--hairline); }
+.pane { min-height: 0; }
+.pane-list { background: var(--canvas); }
+
+.pane-editor {
+    background: var(--canvas);
+    display: flex;
+    flex-direction: row;
+    min-width: 0;
+    flex: 1 1 0;
+    overflow: hidden;
+}
+#editor {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+}
+#solution-editor {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+}
+#solution-editor[hidden] { display: none; }
+
+/* ─── Resizers: 1px hairline, wide hit target, accent on drag ──── */
+.resizer {
+    width: 1px;
+    flex: 0 0 1px;
+    cursor: col-resize;
+    background: var(--hairline);
+    position: relative;
+    transition: background 120ms var(--ease-out, ease-out);
+    z-index: 5;
+}
+/* Expand the hit area without thickening the visible line. */
+.resizer::before {
+    content: "";
+    position: absolute;
+    inset: 0 -4px;
+}
+.resizer:hover,
+.resizer.dragging {
+    background: var(--accent);
+}
+.resizer[hidden] { display: none; }
+/* Vertical resizer inside .pane-editor (between editor and solution). */
+.resizer-v {
+    cursor: col-resize;
+}
 .pane-context {
-    border-right: none;
+    width: var(--context-width, 360px);
+    flex: 0 0 var(--context-width, 360px);
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow: hidden; /* children manage their own scroll */
 }
 
-/* ─── Exercise list ─────────────────────────────────────────────── */
-#exercise-list { display: flex; flex-direction: column; padding: 8px 0; }
-.ex-row {
+/* ─── Sidebar (collapsible status dots) ─────────────────────────── */
+.pane-list {
+    display: flex;
+    flex-direction: column;
+    width: var(--sidebar-width, 12rem);
+    flex: 0 0 var(--sidebar-width, 12rem);
+    overflow: hidden;
+    /* Animate collapse/expand, but NOT manual resizes — the transition makes
+       each pointermove frame lag 160ms behind the cursor ("不跟手"). The
+       resizer JS toggles body.resizing during a drag to suppress it. */
+    transition: width 160ms var(--ease-out, ease-out), flex-basis 160ms var(--ease-out, ease-out);
+}
+body.resizing .pane-list { transition: none; }
+.pane-list.collapsed {
+    --sidebar-width: 2rem;
+}
+/* Scroll the list, keep the toggle pinned above. The scrollbar reserves a
+   6px gutter on the right; since dots use justify-content:center they sit in
+   the middle of the content box, which reads as centered against the column. */
+.pane-list #exercise-list { overflow-y: auto; }
+
+/* Collapse toggle: its own full-width row at the top of the sidebar (flex item,
+   not absolute), so it never overlaps a dot. A quiet chevron that points where
+   the list will go: ‹ when expanded (collapse left), › when collapsed. */
+#sidebar-toggle {
+    flex: 0 0 auto;
+    height: 2rem;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--body-mid);
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;       /* chevron hugs the right edge (expanded) */
+    padding-right: 0.6rem;
+    transition: color 120ms;
+    z-index: 2;
+}
+.pane-list.collapsed #sidebar-toggle {
+    justify-content: center;         /* chevron centered in the narrow column */
+    padding-right: 0;
+}
+#sidebar-toggle:hover {
+    color: var(--ink);
+}
+
+#exercise-list {
+    display: flex;
+    flex-direction: column;
+    padding: 0.4rem 0;
+}
+/* Each exercise is a status dot. Expanded shows the label beside it. */
+.ex-dot {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.6rem;
     width: 100%;
-    padding: 5px 14px;
+    padding: 0.35rem 1rem 0.35rem 1rem;
     background: transparent;
     border: none;
     color: var(--body-mid);
     text-align: left;
     cursor: pointer;
-    font-size: 13px;
     font-family: var(--editor-font-mono);
+    font-size: 0.8rem;
+    line-height: 1.4;
+    position: relative;
 }
-.ex-row:hover { background: var(--canvas-soft); color: var(--body); }
-.ex-row.current { background: var(--canvas-soft); color: var(--ink); }
-.ex-row.solved { color: var(--status-ok); }
-.ex-row.not-runnable { color: var(--body-mid); opacity: 0.6; cursor: not-allowed; }
-.ex-mark { width: 14px; text-align: center; }
-.ex-row.solved .ex-mark { color: var(--status-ok); }
-.ex-row.current .ex-mark { color: var(--accent); }
+/* The dot itself is a pseudo-element so it stays centered when collapsed. */
+.ex-dot::before {
+    content: "";
+    flex-shrink: 0;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--body-mid);         /* default: pending = soft grey */
+    transition: transform 120ms var(--ease-out, ease-out);
+}
+.ex-dot.solved::before { background: var(--status-ok); }       /* green */
+.ex-dot.failed::before { background: var(--status-err); }      /* red */
+.ex-dot.not-runnable::before { background: var(--canvas-mid); }/* grey */
+/* Current exercise: bigger dot + Zig-yellow highlight on dot and label.
+   But if the current exercise is already solved, keep its green — green
+   carries the "done" signal, yellow is only the active-but-pending accent. */
+.ex-dot.current::before {
+    transform: scale(1.6);
+    background: var(--zig-yellow);
+}
+.ex-dot.current .ex-label { color: var(--zig-yellow); }
+.ex-dot.current.solved::before { background: var(--status-ok); }
+.ex-dot.current.solved .ex-label { color: var(--status-ok); }
+.ex-dot:hover { background: var(--canvas-soft); }
+.ex-dot:hover::before { transform: scale(1.3); }
+.ex-dot.current:hover::before { transform: scale(1.6); }
+.ex-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 1;
+    transition: opacity 120ms var(--ease-out, ease-out);
+}
+/* Collapsed: hide labels, center the dots, narrow the rows. */
+.pane-list.collapsed .ex-dot {
+    justify-content: center;
+    padding: 0.45rem 0;
+}
+/* display:none (not width:0) so the dot is the sole flex item and truly centers. */
+.pane-list.collapsed .ex-label { display: none; }
 
-/* ─── Editor pane ───────────────────────────────────────────────── */
-.pane-editor { background: var(--canvas); }
-#editor { height: 100%; }
+/* ─── Context pane: verdict (top) + output (mid) + status bar (bottom) ─
+   One padding, one type ramp, one voice. The verdict is a quiet status line
+   at the top, not a competing card. */
+.context-verdict {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 1.1rem 1.25rem;
+    min-height: 4rem;
+}
 
-/* ─── Context pane ──────────────────────────────────────────────── */
-.context-section { padding: 14px 16px; }
-.context-section h2 { margin: 0 0 8px 0; font-size: 13px; color: var(--body-mid); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-.context-section hr { border: none; border-top: 1px solid var(--hairline); margin: 0; }
-#problem-body p { margin: 0 0 10px 0; line-height: 1.55; }
-#problem-body code { background: var(--canvas-soft); padding: 1px 5px; border-radius: 3px; font-family: var(--editor-font-mono); font-size: 13px; }
-#problem-body ul { margin: 0 0 10px 0; padding-left: 20px; }
-#problem-body li { line-height: 1.55; margin-bottom: 4px; }
-.meta { font-size: 12px; color: var(--body-mid); }
-.meta code { font-family: var(--editor-font-mono); }
-.meta .warn { color: var(--status-err); }
-
-/* Verdict box */
-.verdict-box { font-size: 14px; line-height: 1.5; min-height: 20px; }
-.verdict-box .pass { color: var(--status-ok); font-weight: 600; margin: 0 0 8px 0; }
-.verdict-box .err { color: var(--status-err); font-weight: 600; margin: 0 0 8px 0; }
+/* Verdict: a quiet status line at the top of the context pane. The status
+   uses a leading dot — the same language as the sidebar's ex-dot — coloured
+   by state (green pass / red fail / grey muted). */
+.verdict-box {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    min-height: 0;
+}
+.verdict-box .pass,
+.verdict-box .err,
+.verdict-box .muted {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+    margin: 0 0 0.5rem 0;
+}
+.verdict-box .pass::before,
+.verdict-box .err::before,
+.verdict-box .muted::before {
+    content: "";
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    /* align the dot with the text's x-height midpoint */
+    transform: translateY(0.05em);
+}
+.verdict-box .pass::before { background: var(--status-ok); }
+.verdict-box .err::before  { background: var(--status-err); }
+.verdict-box .muted::before { background: var(--canvas-mid); }
+.verdict-box .pass { color: var(--status-ok); }
+.verdict-box .err  { color: var(--status-err); }
 .verdict-box .muted { color: var(--body-mid); }
-.verdict-box .banner { color: var(--body); background: var(--canvas-soft); padding: 10px; border-radius: 4px; border-left: 3px solid var(--accent); }
-.verdict-box .hint { color: var(--body); background: var(--canvas-soft); padding: 10px; border-radius: 4px; white-space: pre-wrap; }
-.verdict-box .healed { background: var(--canvas-soft); padding: 10px; border-radius: 4px; overflow-x: auto; font-family: var(--editor-font-mono); font-size: 13px; color: var(--body); }
+/* Inline note: a quiet paragraph, no boxed card. */
+.verdict-box .banner,
+.verdict-box .hint {
+    color: var(--body);
+    background: transparent;
+    padding: 0;
+    border: none;
+    border-left: none;
+    margin: 0 0 0.5rem 0;
+    white-space: normal;
+    font-size: 0.85rem;
+    line-height: 1.55;
+}
+.verdict-box .hint { color: var(--body-mid); white-space: pre-wrap; }
 
 /* Diff table */
-.diff { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
-.diff th { text-align: left; color: var(--body-mid); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--hairline); }
-.diff td { vertical-align: top; padding: 0; width: 50%; }
-.diff td pre { margin: 0; padding: 2px 8px; font-family: var(--editor-font-mono); white-space: pre-wrap; word-break: break-word; color: var(--body); }
-.diff-row td pre { background: rgba(166, 107, 107, 0.15); }
-
-.verdict-actions { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
-.check-row { margin-top: 12px; display: flex; gap: 8px; }
-#check, #next, #hint, #reveal {
-    background: var(--canvas-soft);
-    color: var(--body);
-    border: 1px solid var(--hairline);
-    padding: 7px 16px;
-    border-radius: 4px;
-    font-size: 13px;
-    cursor: pointer;
+.diff { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.25rem 0 0.5rem 0; }
+.diff th {
+    text-align: left;
+    color: var(--body-mid);
+    font-family: var(--editor-font-mono);
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    padding: 0.2rem 0.5rem;
+    border-bottom: 1px solid var(--hairline);
 }
-#check { background: var(--accent); color: #1a1a1a; border-color: var(--accent); font-weight: 600; }
-#check:hover { opacity: 0.9; }
-#check:disabled { background: var(--canvas-mid); color: var(--body-mid); border-color: var(--hairline); cursor: not-allowed; }
-#next { background: var(--status-ok); color: #0a0a0a; border-color: var(--status-ok); font-weight: 600; }
+.diff td { vertical-align: top; padding: 0; width: 50%; }
+.diff td pre {
+    margin: 0;
+    padding: 0.15rem 0.5rem;
+    font-family: var(--editor-font-mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--body);
+    line-height: 1.45;
+}
+.diff-row td pre { background: rgba(166, 107, 107, 0.13); }
 
-/* ─── Output pane ───────────────────────────────────────────────── */
+/* Follow-up action buttons inside the verdict (Next / Hint / Reveal|Hide).
+   Bare text — same language as the toolbar. */
+.verdict-actions { margin-top: 0.5rem; display: flex; gap: 0.85rem; flex-wrap: wrap; }
+.verdict-actions button {
+    height: auto;
+    padding: 0.2rem 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--body-mid);
+    font-family: var(--editor-font-mono);
+    font-size: 0.85rem;
+    font-weight: 400;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: color 120ms;
+}
+.verdict-actions button:hover {
+    color: var(--ink);
+    background: transparent;
+    outline: none;
+}
+
+/* ─── Output pane (mid, takes remaining height between verdict and bar) ─── */
 .output-pane {
-    flex: 0 0 auto;
-    height: 180px;
+    flex: 1 1 auto;
+    min-height: 6rem;
     border-top: 1px solid var(--hairline);
     display: flex;
     flex-direction: column;
     background: var(--canvas);
 }
-.output-header { padding: 6px 16px; font-size: 12px; color: var(--body-mid); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--hairline); }
-#output-pad { flex: 1 1 auto; overflow: auto; padding: 8px 16px; font-family: var(--editor-font-mono); font-size: 13px; }
+#output-pad {
+    flex: 1 1 auto;
+    overflow: auto;
+    padding: 0.75rem 1.25rem;
+    font-family: var(--editor-font-mono);
+    font-size: calc(var(--editor-font-size) - 1px);
+    line-height: var(--editor-line-height);
+}
+
 .output-block { white-space: pre-wrap; word-break: break-word; }
 .output-block.stderr { color: var(--body); }
 .output-block.stdout { color: var(--zig-yellow); }
 
-/* ─── Footer ────────────────────────────────────────────────────── */
-.attribution {
-    padding: 8px 16px;
-    font-size: 11px;
-    color: var(--body-mid);
-    border-top: 1px solid var(--hairline);
-    flex: 0 0 auto;
-}
-
 /* ─── Responsive (narrow) ───────────────────────────────────────── */
 @media (max-width: 900px) {
-    .shell { grid-template-columns: 1fr; }
-    .pane-list, .pane-context { max-height: 30vh; overflow-y: auto; }
-    .pane { border-right: none; border-bottom: 1px solid var(--hairline); }
+    .shell { flex-direction: column; }
+    .pane-context { display: none; }
+    .resizer { display: none; }
+    .pane-list {
+        --sidebar-width: 1.75rem;
+        width: 100%;
+        flex-basis: 1.75rem;
+        height: 1.75rem;
+    }
+    .pane-list .ex-label { display: none; }
+    .pane-list .ex-dot { justify-content: center; padding-left: 0; padding-right: 0; }
+    .pane-editor { width: 100%; }
 }
