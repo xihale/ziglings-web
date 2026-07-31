@@ -347,15 +347,15 @@ function setRunState(state: RunState): void {
   runBtn.classList.toggle("err", state === "err");
   if (state === "busy") runBtn.title = "Running…";
   else if (state === "err") runBtn.title = "Failed";
-  else if (runMode === "next") runBtn.title = "Next exercise";
+  else if (runMode === "next") runBtn.title = "Next exercise (F10)";
   else if (state === "ok") runBtn.title = "Passed";
-  else runBtn.title = "Run (⌘S)";
+  else runBtn.title = "Run (F10)";
 }
 /** Flip the top-bar button into "Next" mode after a pass. */
 function setRunNext(): void {
   runMode = "next";
   runBtn.replaceChildren(document.createTextNode("Next"));
-  runBtn.title = "Next exercise";
+  runBtn.title = "Next exercise (F10)";
 }
 /** Restore the button to its normal "Run" verb (called on openExercise).
  *  Rebuilds the spinner span that the busy state animates. */
@@ -697,7 +697,6 @@ function bootEditor(initialDoc: string): void {
         indentUnit.of("    "),
         keymap.of([
           indentWithTab,
-          { key: "Mod-s", preventDefault: true, run: (v) => { formatDocument(v); startCheck(); return true; } },
         ]),
         zigLanguage,
         syntaxHighlighting(highlightStyle),
@@ -819,6 +818,12 @@ function bootSolutionEditor(): void {
 runBtn.addEventListener("click", () => {
   if (runMode === "next") goNext();
   else startCheck();
+});
+
+// F10 = the Run/Next verb button: runs the check, and once an exercise
+// passes (the button flips to "Next"), F10 advances to the next exercise.
+document.addEventListener("keydown", (e) => {
+  if (e.key === "F10") { e.preventDefault(); runBtn.click(); }
 });
 
 // ─── Export / Import ──────────────────────────────────────────────
