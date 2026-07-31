@@ -12,3 +12,7 @@ public/compilers/**
 !public/compilers/.gitkeep
 **/*.wasm
 !**/node_modules/**/*.wasm
+
+# AI coding tool artifacts (design docs, session plans, etc.)
+.zcode/
+x.ai/
