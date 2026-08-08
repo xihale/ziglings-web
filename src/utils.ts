@@ -1,81 +1,57 @@
-import { untar } from "@andrewbranch/untar.js";
-import { Directory, File, ConsoleStdout, wasi as wasi_defs } from "@bjorn3/browser_wasi_shim";
-import { fetchCompilerResponse } from "./compiler-cache";
-import { compilerAssetUrl } from "./version";
+/**
+ * Compiler asset access for ziglings-web, delegated to the playground's served
+ * loader (https://zp.xihale.top/zp-loader.js). The loader owns the
+ * hash-filename / meta.json / Cache-Storage contract; this thin wrapper just
+ * fixes the loader origin from versions.json → assetOrigin.
+ *
+ * Logical names (the loader resolves content-hash filenames from meta.json):
+ *   "zig.wasm", "zls.wasm", "libcompiler_rt.a", "zig.tar.gz"
+ */
 
-export async function fetchAssetBuffer(url: URL | string): Promise<ArrayBuffer> {
-    const href = typeof url === "string" ? url : url.href;
-    const response = await fetchCompilerResponse(href);
-    if (!response.ok) {
-        throw new Error(`fetch ${href}: HTTP ${response.status}`);
-    }
-    return response.arrayBuffer();
+import { ConsoleStdout, wasi as wasi_defs } from "@bjorn3/browser_wasi_shim";
+import { loadVersionsManifest } from "./version";
+
+/** Loader URL = <assetOrigin>/zp-loader.js (defaults to the playground). */
+function loaderUrl(): string {
+    const origin = loadVersionsManifest().assetOrigin;
+    if (!origin) throw new Error("versions.json: assetOrigin required (consumer mode)");
+    const root = origin.endsWith("/") ? origin : `${origin}/`;
+    return `${root}zp-loader.js`;
 }
 
-export async function compileWasmAsset(url: URL | string): Promise<WebAssembly.Module> {
-    const href = typeof url === "string" ? url : url.href;
-    // Compiler trees: Cache Storage (GHP ignores long Cache-Control). Hashed UI chunks
-    // still rely on the normal HTTP cache.
-    const response = await fetchCompilerResponse(href);
-    if (!response.ok) {
-        throw new Error(`fetch ${href}: HTTP ${response.status}`);
-    }
-    // compileStreaming needs a body stream; Response from Cache Storage works.
-    return WebAssembly.compileStreaming(response);
+let loaderPromise: Promise<typeof import("./zp-loader-types")> | null = null;
+
+/**
+ * Lazily import the served loader. Bundlers (Vite/Rolldown) leave a remote
+ * `https://` import as-is — it loads at runtime in the browser/worker.
+ */
+function loader(): Promise<typeof import("./zp-loader-types")> {
+    if (!loaderPromise) loaderPromise = import(/* @vite-ignore */ loaderUrl());
+    return loaderPromise;
 }
 
-/** Load std lib tarball for a specific compiler version id. */
-export async function getZigArchive(versionId: string): Promise<Directory> {
-    return loadZigArchive(compilerAssetUrl(versionId, "zig.tar.gz"));
+/** Fetch a logical compiler file as bytes (hash resolved from meta.json). */
+export async function fetchCompilerFile(
+    versionId: string,
+    logicalName: string,
+): Promise<ArrayBuffer> {
+    const mod = await loader();
+    return mod.fetchCompilerFile(versionId, logicalName);
 }
 
-async function loadZigArchive(tarUrl: string): Promise<Directory> {
-    const response = await fetchCompilerResponse(tarUrl);
-    if (!response.ok) {
-        throw new Error(`fetch ${tarUrl}: HTTP ${response.status}`);
-    }
-    let arrayBuffer = await response.arrayBuffer();
-    const magicNumber = new Uint8Array(arrayBuffer).slice(0, 2);
-    if (magicNumber[0] == 0x1F && magicNumber[1] == 0x8B) {
-        const ds = new DecompressionStream("gzip");
-        const gunzipped = new Response(new Response(arrayBuffer).body!.pipeThrough(ds));
-        arrayBuffer = await gunzipped.arrayBuffer();
-    }
-    const entries = untar(arrayBuffer);
-
-    let root: TreeNode = new Map();
-
-    for (const e of entries) {
-        if (!e.filename.startsWith("lib/")) continue;
-        const path = e.filename.slice("lib/".length);
-        const splitPath = path.split("/");
-
-        let c = root;
-        for (const segment of splitPath.slice(0, -1)) {
-            if (!c.has(segment)) {
-                c.set(segment, new Map());
-            }
-            c = c.get(segment) as TreeNode;
-        }
-
-        c.set(splitPath[splitPath.length - 1], e.fileData);
-    }
-
-    return convert(root);
+/** Compile a logical `.wasm` compiler asset (hash resolved from meta.json). */
+export async function compileCompilerWasm(
+    versionId: string,
+    logicalName: string,
+): Promise<WebAssembly.Module> {
+    const mod = await loader();
+    return mod.compileCompilerWasm(versionId, logicalName);
 }
 
-type TreeNode = Map<string, TreeNode | Uint8Array>;
-
-function convert(node: TreeNode): Directory {
-    return new Directory(
-        [...node.entries()].map(([key, value]) => {
-            if (value instanceof Uint8Array) {
-                return [key, new File(value)];
-            } else {
-                return [key, convert(value)];
-            }
-        })
-    )
+/** Load the std-lib tarball (`zig.tar.gz`) as a WASI directory tree. */
+export async function getZigArchive(versionId: string): Promise<import("@bjorn3/browser_wasi_shim").Directory> {
+    const mod = await loader();
+    return mod.getZigLibDir(versionId);
 }
 
 export function stderrOutput(): ConsoleStdout {

@@ -14,13 +14,16 @@ import {
     ConsoleStdout,
 } from "@bjorn3/browser_wasi_shim";
 import { wasi as wasi_defs } from "@bjorn3/browser_wasi_shim";
-import { compileWasmAsset, fetchAssetBuffer, getZigArchive } from "../utils";
+import {
+    compileCompilerWasm,
+    fetchCompilerFile,
+    getZigArchive,
+} from "../utils";
 import {
     type FlatEntry,
     loadZirCacheEntries,
     saveZirCacheEntries,
 } from "../zir-cache";
-import { compilerAssetUrl } from "../version";
 import type { ClientMsg, WorkerMsg, ZirCacheInfo } from "../shared-protocol";
 
 /**
@@ -152,8 +155,8 @@ function ensureCompiler(versionId: string): Promise<Ready> {
             const [zirHit, libDirectory, compilerRt, zigModule] = await Promise.all([
                 loadZirCacheEntries(versionId),
                 getZigArchive(versionId),
-                fetchAssetBuffer(compilerAssetUrl(versionId, "libcompiler_rt.a")),
-                compileWasmAsset(compilerAssetUrl(versionId, "zig.wasm")),
+                fetchCompilerFile(versionId, "libcompiler_rt.a"),
+                compileCompilerWasm(versionId, "zig.wasm"),
             ]);
 
             let zirCache: ZirCacheInfo | null = null;

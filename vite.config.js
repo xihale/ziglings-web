@@ -32,7 +32,9 @@ function parseScheduleSeconds(schedule) {
 const STABLE_MAX_AGE = 365 * 24 * 60 * 60; // 1y
 const HASHED_ASSET_MAX_AGE = STABLE_MAX_AGE;
 
-/** Mirror src/version.ts compilerCacheControlHeader for preview. */
+/** Cache-Control for the preview server. (Consumer mode: compilers live on the
+ *  playground under content-hashed names, served immutable there; this only
+ *  governs this site's own shell / versions.json / Vite UI chunks.) */
 function cacheControlForPath(path) {
   if (
     path === "/" ||
@@ -65,8 +67,9 @@ function cacheControlForPath(path) {
 }
 
 // Note: GitHub Pages ignores custom Cache-Control (always max-age=600).
-// Production longevity for compilers is handled by src/compiler-cache.ts (Cache Storage).
-// These headers apply to `vite preview` and any host that honors them.
+// Production longevity for compilers is handled by the served loader
+// (zp-loader.js), which caches fetched assets in Cache Storage on the
+// playground's origin. These headers apply to `vite preview` and any host that honors them.
 export default defineConfig({
   base,
   publicDir: "public",
