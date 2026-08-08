@@ -1,6 +1,6 @@
 //
 // Prerequisite :
-//    - exercise/109_files.zig, or
+//    - exercise/106_files.zig, or
 //    - create a file {project_root}/output/zigling.txt
 //      with content `It's zigling time!`(18 bytes total)
 //
@@ -28,7 +28,7 @@ pub fn main(init: std.process.Init) !void {
     // Get the current working directory
     const cwd = std.Io.Dir.cwd();
 
-    // try to open ./output assuming you did your 109_files exercise
+    // try to open ./output assuming you did your 106_files exercise
     var output_dir = try cwd.openDir(io, "output", .{});
     defer output_dir.close(io);
 
@@ -36,10 +36,10 @@ pub fn main(init: std.process.Init) !void {
     const file = try output_dir.openFile(io, "zigling.txt", .{});
     defer file.close(io);
 
-    // initialize an array of u8 entirely with the letter 'A'
+    // initialize an array of u8 with all letter 'A'
     // we need to pick the size of the array, 64 seems like a good number
-    // do you remember the array repetition function?
-    var content: ??? = ???('A');
+    // fix the initialization below
+    var content = ['A']*64;
     // this should print out : `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`
     std.debug.print("{s}\n", .{content});
 

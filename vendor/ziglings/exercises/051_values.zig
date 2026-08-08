@@ -54,7 +54,7 @@ var global_wizard = Character{};
 // an extremely efficient place for memory storage.
 //
 // Also, when a function executes, the input arguments are often
-// loaded into the beating heart of the CPU itself, in registers.
+// loaded into the beating heart of the CPU itself in registers.
 //
 // Our main() function here has no input parameters, but it will have
 // a stack entry (called a "frame").

@@ -37,24 +37,6 @@
 //    self, others use a lowercase version of the type name, but feel
 //    free to use whatever is most appropriate.
 //
-//    "But hold on," you say, eyeing a() and b() suspiciously, "why
-//    does one take 'self' and another take '*self'?" Sharp eye!
-//
-//    It all comes down to a single question: does the function need
-//    to CHANGE the struct?
-//
-//      * Needs to change it?  Take a pointer (*Bar). Without it you'd
-//        be scribbling on a COPY, and your changes would evaporate the
-//        instant the function returns. Poof.
-//      * Only reads it?  Plain Bar is just fine.
-//        (For a big, bulky struct you might still write *const Bar to
-//        avoid copying it around, but for small ones a copy is cheap.)
-//
-//    You'll see this below: zap() takes 'self: HeatRay' by value
-//    because it only reads the ray's damage, but it takes the alien
-//    as '*Alien' because zapping is supposed to HURT - and that means
-//    changing the alien's health for real, not on a throwaway copy.
-//
 // Okay, you're armed.
 //
 // Now, please zap the alien structs until they're all gone or

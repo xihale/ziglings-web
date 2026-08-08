@@ -1,11 +1,11 @@
---- exercises/071_comptime6.zig	2026-06-01 15:35:27.223400223 +0200
-+++ answers/071_comptime6.zig	2026-06-01 15:36:35.349728561 +0200
-@@ -41,7 +41,7 @@
-     const field_names = @typeInfo(Narcissus).@"struct".field_names;
-     const field_types = @typeInfo(Narcissus).@"struct".field_types;
+--- exercises/071_comptime6.zig	2024-09-02 19:21:50.250454978 +0200
++++ answers/071_comptime6.zig	2024-09-02 19:21:23.553250563 +0200
+@@ -40,7 +40,7 @@
+ 
+     const fields = @typeInfo(Narcissus).@"struct".fields;
  
 -    ??? {
-+    inline for (field_names, field_types) |field_name, field_type| {
-         if (field_type != void) {
-             print(" {s}", .{field_name});
++    inline for (fields) |field| {
+         if (field.type != void) {
+             print(" {s}", .{field.name});
          }

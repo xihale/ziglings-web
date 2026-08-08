@@ -1,8 +1,10 @@
 // Spec §6.4 Check 3: assert catalog.zigFloor <= the compiler version we serve.
 //
-// The compiler version we serve is versions.json's default id (master). Its
-// actual Zig version string lives in the playground's deployed meta.json at
-// <assetOrigin>/compilers/<id>/meta.json. This check fetches that and compares.
+// ziglings-web is a pure consumer: the compiler version string lives in the
+// playground's deployed versions.json at <assetOrigin>/versions.json
+// (versions[].zigVersionString), NOT in meta.json (which is now {id, builtAt,
+// files} — no version string). This check fetches that and compares the served
+// default id's version against catalog.zigFloor.
 //
 // Fails (exit 1) if the floor exceeds the served compiler, blocking deploy.
 
@@ -46,16 +48,18 @@ function compareCore(a, b) {
 
 async function servedCompilerVersion() {
     if (!origin) {
-        // Self-hosted compiler: we can't know without building. Skip with a note.
+        // No assetOrigin: can't know the served version. Skip with a note.
         return null;
     }
     const base = origin.endsWith("/") ? origin : `${origin}/`;
-    const url = `${base}compilers/${versionId}/meta.json`;
+    // zigVersionString lives on the version entry in versions.json (not meta.json).
+    const url = `${base}versions.json`;
     try {
         const res = await fetch(url, { redirect: "follow" });
         if (!res.ok) return { error: `HTTP ${res.status}` };
-        const meta = await res.json();
-        return { version: meta.zigVersionString ?? meta.zigVersion ?? meta.version ?? null };
+        const manifest = await res.json();
+        const entry = (manifest.versions ?? []).find((v) => v.id === versionId);
+        return { version: entry?.zigVersionString ?? null };
     } catch (err) {
         return { error: String(err) };
     }

@@ -3,10 +3,12 @@
 //
 // Steps:
 //   1. Copy exercises/*.zig and patches/patches/*.patch verbatim into vendor/ziglings/.
-//   2. Build a throwaway build dir: place a *patched* copy of elrond.zig
-//      (exercises + Kind exposed as `pub`) next to a copy of gen-catalog.zig,
-//      then `zig run -Mroot=<dir>/gen-catalog.zig`. The submodule itself is
-//      never modified; the patch is a reproducible sed transform.
+//   2. Build a throwaway build dir: place a *patched* copy of Ziglings'
+//      build.zig (exercises + Kind exposed as `pub`) next to a copy of
+//      gen-catalog.zig, then `zig run -Mroot=<dir>/gen-catalog.zig`. The
+//      submodule itself is never modified; the patch is a reproducible
+//      transform. (build.zig imports test/tests.zig, which is also copied so
+//      the import resolves.)
 //   3. Stamp the real submodule commit SHA into catalog.version.
 //   4. Apply the file-IO heuristic to derive final `runnable` per exercise.
 //   5. Serialize with stable formatting and write vendor/ziglings/catalog.json.
@@ -32,8 +34,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const src = resolve(root, "vendor/ziglings-src");
 const out = resolve(root, "vendor/ziglings");
 
-// --- 0. sanity: submodule present ---
-if (!existsSync(resolve(src, "rivendell/elrond.zig"))) {
+// --- 0. sanity: submodule present + the file gen-catalog imports exists ---
+if (!existsSync(resolve(src, "build.zig"))) {
   console.error("vendor/ziglings-src not populated. Run: git submodule update --init");
   process.exit(1);
 }
@@ -54,17 +56,23 @@ for (const f of readdirSync(patchDir)) {
 // Carry the LICENSE for attribution.
 cpSync(resolve(src, "LICENSE"), resolve(out, "LICENSE"));
 
-// --- 2. run the Zig generator against a patched throwaway copy of elrond ---
-// elrond keeps `exercises` and `Kind` file-private; expose them on a copy.
+// --- 2. run the Zig generator against a patched throwaway copy of build.zig ---
+// build.zig keeps `exercises` and `Kind` file-private; expose them on a copy.
+// It also imports test/tests.zig (and that file @import("../build.zig") back),
+// so place both into the temp dir for the import to resolve.
 const buildDir = join(tmpdir(), "ziglings-web-gencat");
 rmSync(buildDir, { recursive: true, force: true });
 mkdirSync(buildDir, { recursive: true });
+mkdirSync(join(buildDir, "test"), { recursive: true });
 
-const elrondRaw = readFileSync(resolve(src, "rivendell/elrond.zig"), "utf8");
-const elrondPatched = elrondRaw
+const buildRaw = readFileSync(resolve(src, "build.zig"), "utf8");
+const buildPatched = buildRaw
   .replace(/^const exercises\b/m, "pub const exercises")
   .replace(/^const Kind\b/m, "pub const Kind");
-writeFileSync(join(buildDir, "elrond.zig"), elrondPatched, "utf8");
+writeFileSync(join(buildDir, "build.zig"), buildPatched, "utf8");
+if (existsSync(resolve(src, "test/tests.zig"))) {
+  cpSync(resolve(src, "test/tests.zig"), join(buildDir, "test/tests.zig"));
+}
 cpSync(resolve(root, "scripts/gen-catalog.zig"), join(buildDir, "gen-catalog.zig"));
 
 const raw = execFileSync("zig", ["run", `-Mroot=${join(buildDir, "gen-catalog.zig")}`], {

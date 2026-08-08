@@ -1,5 +1,5 @@
 //
-// We've already learned about switch statements in exercises 030, 031 and 111.
+// We've already learned about switch statements in exercises 030, 031 and 108.
 // They also work with packed containers:
 
 const S = packed struct(u2) {
@@ -51,11 +51,11 @@ comptime {
 //
 // Try to make the float below negative:
 
-// IEEE 754 binary16 floating-point format
+/// IEEE 754 half precision float
 const Float = packed union(u16) {
     value: f16,
     bits: packed struct(u16) {
-        significand: u10,
+        mantissa: u10,
         exponent: u5,
         sign: u1,
     },

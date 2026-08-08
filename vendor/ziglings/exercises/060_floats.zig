@@ -27,17 +27,10 @@
 // the types match. Zig does not perform unsafe type coercions
 // behind your back:
 //
-//    var foo: f16 = 5;       // NO ERROR
+//    var foo: f16 = 5; // NO ERROR
 //
-//    A runtime value can coerce to a different type,
-//    as long as the value is losslessly representable:
-//
-//    var foo: u16 = 5;
-//    var bar: f16 = foo;     // NO ERROR (5 fits in f16)
-//
-//    var foo: u16 = 49876;
-//    var bar: f16 = foo;     // ERROR (49876 not representable in f16)
-//
+//    var foo: u16 = 5; // A literal of a different type
+//    var bar: f16 = foo; // ERROR
 //
 // Please fix the two float problems with this program and
 // display the result as a whole number.

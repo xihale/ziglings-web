@@ -93,12 +93,3 @@ pub fn main() !void {
 //
 // For Crypto it is better not to use this, but in sorting algorithms like
 // Bubble Sort it works very well.
-//
-// By the way, congratulations for making it to Exercise 100!
-//
-//    +-------------+
-//    | Celebration |
-//    | Area  * * * |
-//    +-------------+
-//
-// Please keep your celebrating within the area provided.

@@ -50,7 +50,7 @@ pub fn main(init: std.process.Init) !void {
     // wait a minute...
     // opening a directory might fail!
     // what should we do here?
-    var output_dir: std.Io.Dir = cwd.openDir(io, "output", .{});
+    var output_dir: std.Io.Dir = try cwd.openDir(io, "output", .{});
     defer output_dir.close(io);
 
     // we try to open the file `zigling.txt`,

@@ -74,26 +74,35 @@ fn printTuple(tuple: anytype) void {
     //     @typeInfo() - takes a type, returns a TypeInfo union
     //                   with fields specific to that type.
     //
-    //     The list of a struct type's field types can be found in
-    //     TypeInfo's @"struct".field_types.
+    //     The list of a struct type's fields can be found in
+    //     TypeInfo's @"struct".fields.
     //
     //     Example:
     //
-    //         @typeInfo(Circle).@"struct".field_types
+    //         @typeInfo(Circle).@"struct".fields
     //
-    // This will be an array of field types.
-    const field_types = ???;
-
-    // This will be an array of field names.
-    const field_names = ???;
+    // This will be an array of StructFields.
+    const fields = ???;
 
     // 2. Loop through each field. This must be done at compile
     // time.
     //
     //     Hint: remember 'inline' loops?
     //
-    for (???, ???) |???, ???| {
+    for (fields) |field| {
         // 3. Print the field's name, type, and value.
+        //
+        //     Each 'field' in this loop is one of these:
+        //
+        //         pub const StructField = struct {
+        //             name: [:0]const u8,
+        //             type: type,
+        //             default_value_ptr: ?*const anyopaque,
+        //             is_comptime: bool,
+        //             alignment: comptime_int,
+        //         };
+        //
+        //     Note we will learn about 'anyopaque' type later
         //
         //     You'll need this builtin:
         //
@@ -114,8 +123,8 @@ fn printTuple(tuple: anytype) void {
         // for declarations. If it's a value, it looks for data.
         //
         print("\"{s}\"({any}):{any} ", .{
-            field_name,
-            field_type,
+            field.???,
+            field.???,
             ???,
         });
     }

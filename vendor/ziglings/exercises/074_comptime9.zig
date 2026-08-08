@@ -1,5 +1,4 @@
-const std = @import("std");
-const print = std.debug.print;
+const print = @import("std").debug.print;
 
 // We're going to (ab)use the power of Zig to make animal hybrid creatures!
 // What do you think a GatorMouse would look like?  Eek.
@@ -32,7 +31,7 @@ fn makeCreature(comptime count: usize, comptime fmt: []const u8) [count]Animal {
 
     // We return an array of animals representing the creature. (This is why we
     // really needed the 'count' parameter. Arrays need a size.)
-    var animals: [count]Animal = undefined;
+    var animals: [count]Animal = .{undefined} ** count;
     var next_animal: usize = 0;
 
     inline for (fmt) |char| {
@@ -59,7 +58,7 @@ fn makeCreature(comptime count: usize, comptime fmt: []const u8) [count]Animal {
                 // other animals or is this an error?
                 'g' => ???,
 
-                else => @compileError(std.fmt.comptimePrint("No animal starts with '{c}'!", .{char})),
+                else => @compileError("No animal starts with '" ++ char ++ "'!"),
             },
 
             .l => switch (char) {

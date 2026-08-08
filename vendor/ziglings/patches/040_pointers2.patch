@@ -1,5 +1,5 @@
---- exercises/040_pointers2.zig	2026-05-22 21:57:28.601255748 +0200
-+++ answers/040_pointers2.zig	2026-05-22 21:57:27.672235943 +0200
+--- exercises/040_pointers2.zig	2023-10-03 22:15:22.122241138 +0200
++++ answers/040_pointers2.zig	2023-10-05 20:04:07.022766257 +0200
 @@ -23,7 +23,7 @@
  
  pub fn main() void {

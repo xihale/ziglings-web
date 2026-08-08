@@ -1,6 +1,6 @@
---- exercises/028_defer2.zig	2026-06-02 06:08:12.713672612 +0200
-+++ answers/028_defer2.zig	2026-06-02 06:08:43.262234023 +0200
-@@ -20,7 +20,7 @@
+--- exercises/028_defer2.zig	2023-10-03 22:15:22.122241138 +0200
++++ answers/028_defer2.zig	2023-10-05 20:04:06.966098530 +0200
+@@ -18,7 +18,7 @@
  fn printAnimal(animal: u8) void {
      std.debug.print("(", .{});
  
@@ -9,15 +9,3 @@
  
      if (animal == 'g') {
          std.debug.print("Goat", .{});
-@@ -51,9 +51,9 @@
- 
-     // Try reordering the statements to get the answer 42
-     {
--        defer x = x / 10;
--        defer x = x + 11;
-         defer x = x * 2;
-+        defer x = x + 11;
-+        defer x = x / 10;
-     }
- 
-     return x;

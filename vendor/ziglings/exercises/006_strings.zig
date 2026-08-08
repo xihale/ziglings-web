@@ -27,6 +27,10 @@ pub fn main() void {
     const d: u8 = ziggy[???];
 
     // (Problem 2)
+    // Use the array repeat '**' operator to make "ha ha ha ".
+    const laugh = "ha " ???;
+
+    // (Problem 3)
     // Use the array concatenation '++' operator to make "Major Tom".
     // (You'll need to add a space as well!)
     const major = "Major";
@@ -34,7 +38,7 @@ pub fn main() void {
     const major_tom = major ??? tom;
 
     // That's all the problems. Let's see our results:
-    std.debug.print("d={u} {s}\n", .{ d, major_tom });
+    std.debug.print("d={u} {s}{s}\n", .{ d, laugh, major_tom });
     // Keen eyes will notice that we've put 'u' and 's' inside the '{}'
     // placeholders in the format string above. This tells the
     // print() function to format the values as a UTF-8 character and

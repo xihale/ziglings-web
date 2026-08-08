@@ -1,5 +1,5 @@
 //
-// In Exercises 85-94 and quiz 95, we learned about Zig's Io interface for
+// In Exercises 84-91, we learned about Zig's Io interface for
 // concurrent execution: io.async(), Group, Select, and Futures.
 // Under the hood, the Threaded backend manages a pool of real
 // OS threads for you - including scheduling, cancellation, and
@@ -74,11 +74,11 @@ pub fn main() !void {
     // before the parallel processing begins.
     std.debug.print("Starting work...\n", .{});
 
-    // These curly braces are very important, they are necessary
-    // to enclose the area where the threads are called and joined.
-    // With these braces, the program will block and wait for all threads
-    // to finish right at the closing brace of this block, ensuring
-    // "Zig is cool!" is always printed last.
+    // These curly brackets are very important, they are necessary
+    // to enclose the area where the threads are called.
+    // Without these brackets, the program would not wait for the
+    // end of the threads and they would continue to run beyond the
+    // end of the program.
     {
         // Now we start the first thread, with the number as parameter
         const handle = try std.Thread.spawn(.{}, thread_function, .{1});
@@ -102,7 +102,8 @@ pub fn main() !void {
         try io.sleep(std.Io.Duration.fromMilliseconds(400), .awake);
         std.debug.print("Some weird stuff, after starting the threads.\n", .{});
     }
-    // The threads are guaranteed to be finished by the time we reach here.
+    // After we have left the closed area, we wait until
+    // the threads have run through, if this has not yet been the case.
     std.debug.print("Zig is cool!\n", .{});
 }
 

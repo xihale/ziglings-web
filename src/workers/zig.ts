@@ -1,11 +1,15 @@
 import { WASI, PreopenDirectory, Fd, File, OpenFile, Inode, Directory } from "@bjorn3/browser_wasi_shim";
-import { compileWasmAsset, fetchAssetBuffer, getZigArchive, stderrOutput } from "../utils";
+import {
+    compileCompilerWasm,
+    fetchCompilerFile,
+    getZigArchive,
+    stderrOutput,
+} from "../utils";
 import {
     type FlatEntry,
     loadZirCacheEntries,
     saveZirCacheEntries,
 } from "../zir-cache";
-import { compilerAssetUrl } from "../version";
 
 type Ready = {
     libDirectory: Directory;
@@ -92,8 +96,8 @@ function ensureReady(): Promise<Ready> {
             const [zirHit, libDirectory, compilerRt, zigModule] = await Promise.all([
                 loadZirCacheEntries(id),
                 getZigArchive(id),
-                fetchAssetBuffer(compilerAssetUrl(id, "libcompiler_rt.a")),
-                compileWasmAsset(compilerAssetUrl(id, "zig.wasm")),
+                fetchCompilerFile(id, "libcompiler_rt.a"),
+                compileCompilerWasm(id, "zig.wasm"),
             ]);
 
             let zirCache: Ready["zirCache"] = null;

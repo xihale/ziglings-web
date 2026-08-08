@@ -27,19 +27,3 @@ pub fn main() void {
 
     std.debug.print("a: {}, b: {}\n", .{ a, b.* });
 }
-//
-// A look into the future:
-// When you allocate memory, you store the returned address in
-// a const var. The pointer itself never changes — it always
-// refers to the same allocation — but you can still read and
-// write the data it points to.
-//
-// Example:
-//
-//     const buf = try allocator.alloc(u8, 1024);
-//     buf[0] = 42;  // fine: the *contents* are mutable
-//
-// Note:
-// Passing this pointer to a function is cheap: it's just an address
-// copied on the stack. The caller can work with the data without
-// needing to know where it came from or how it was allocated.
