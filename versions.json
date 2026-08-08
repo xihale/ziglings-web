@@ -1,11 +1,10 @@
 {
-  "default": "master",
+  "default": "0.16.0",
   "assetOrigin": "https://zp.xihale.top/",
   "versions": [
     {
-      "id": "master",
-      "label": "master",
-      "schedule": "3d"
+      "id": "0.16.0",
+      "label": "0.16.0"
     }
   ]
 }
