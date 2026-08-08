@@ -14,7 +14,7 @@
 //
 // A common activity in microcontroller programming is setting and clearing
 // bits on input and output pins. This lets you control LEDs, sensors, motors
-// and more! In a previous exercise (100_bit_manipulation.zig) you learned how
+// and more! In a previous exercise (097_bit_manipulation.zig) you learned how
 // to swap two bytes using the ^ (XOR - exclusive or) operator. This quiz will
 // test your knowledge of bit manipulation in Zig while giving you a taste of
 // what it's like to control registers in a real microcontroller. Included at

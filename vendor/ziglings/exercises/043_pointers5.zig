@@ -1,6 +1,6 @@
 //
 // As with integers, you can pass a pointer to a struct when you
-// wish to modify that struct. Pointers are also useful when
+// will wish to modify that struct. Pointers are also useful when
 // you need to store a reference to a struct (a "link" to it).
 //
 //     const Vertex = struct{ x: u32, y: u32, z: u32 };

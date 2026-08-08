@@ -51,3 +51,12 @@ pub fn main() void {
 //
 // You are perhaps wondering what happens if one of the two lists
 // is longer than the other? Try it!
+//
+// By the way, congratulations for making it to Exercise 100!
+//
+//    +-------------+
+//    | Celebration |
+//    | Area  * * * |
+//    +-------------+
+//
+// Please keep your celebrating within the area provided.

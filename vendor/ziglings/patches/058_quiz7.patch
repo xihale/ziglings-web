@@ -1,5 +1,5 @@
---- exercises/058_quiz7.zig	2026-05-04 16:34:31.692458399 +0200
-+++ answers/058_quiz7.zig	2026-05-04 16:34:29.239406323 +0200
+--- exercises/058_quiz7.zig	2024-10-28 09:06:49.448505460 +0100
++++ answers/058_quiz7.zig	2024-10-28 09:35:14.631932322 +0100
 @@ -192,8 +192,8 @@
              // Oops! The hermit forgot how to capture the union values
              // in a switch statement. Please capture each value as
@@ -11,7 +11,7 @@
          }
      }
  };
-@@ -254,7 +254,7 @@
+@@ -255,7 +255,7 @@
              // dereference and optional value "unwrapping" look
              // together. Remember that you return the address with the
              // "&" operator.
@@ -20,7 +20,7 @@
              // Try to make your answer this long:__________;
          }
          return null;
-@@ -308,7 +308,7 @@
+@@ -309,7 +309,7 @@
      //
      // Looks like the hermit forgot something in the return value of
      // this function. What could that be?

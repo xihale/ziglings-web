@@ -14,7 +14,7 @@
 // exercises.
 //
 // A nice example of this has been published on the Zig homepage,
-// replacing the somewhat dusty 'Hello world!'
+// replacing the somewhat dusty 'Hello world!
 //
 // Nothing against 'Hello world!', but it just doesn't do justice
 // to the elegance of Zig and that's a pity, if someone takes a short,

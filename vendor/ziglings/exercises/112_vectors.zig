@@ -73,7 +73,7 @@
 // Operations performed on vectors in Zig will be done in parallel using
 // SIMD instructions, whenever possible.
 //
-// Defining vectors in Zig is straightforward. No library import is needed.
+// Defining vectors in Zig is straightforwards. No library import is needed.
 const v1 = @Vector(3, i32){ 1, 10, 100 };
 const v2 = @Vector(3, f32){ 2.0, 3.0, 5.0 };
 
@@ -145,7 +145,3 @@ pub fn main() void {
     print("Max difference (old fn): {d: >5.3}\n", .{mpd_old});
     print("Max difference (new fn): {d: >5.3}\n", .{mpd_new});
 }
-
-// Another cool feature of Vectors is repeating patterns.
-// Remember the arrays exercise from earlier where we created an array
-// by repeating a pattern? See `005_arrays2.zig`.

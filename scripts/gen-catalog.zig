@@ -1,16 +1,23 @@
 const std = @import("std");
 
 // Catalog generator: reads Ziglings' exercise array and emits catalog JSON
-// to stdout. Designed to run against a *patched* copy of elrond.zig that
-// lives in the same directory as this file (see scripts/sync-ziglings.mjs,
+// to stdout. Designed to run against a *patched* copy of Ziglings' build.zig
+// that lives in the same directory as this file (see scripts/sync-ziglings.mjs,
 // which applies the `pub` patch and places both files together in a temp
 // dir, then runs `zig run -Mroot=.../gen-catalog.zig`).
 //
-// Why a patched copy: elrond.zig keeps `exercises` and `Kind` file-private.
-// We expose them via a reproducible sed transform on a throwaway copy;
-// the committed submodule is never modified.
+// Why a patched copy: build.zig keeps `exercises` and `Kind` file-private.
+// We expose them via a reproducible transform on a throwaway copy; the
+// committed submodule is never modified.
+//
+// Structure notes:
+//   - v0.16.0 (this target): exercises + Kind live in build.zig, and build.zig
+//     imports test/tests.zig (which @import("../build.zig") back — a benign
+//     cycle Zig resolves). build.zig also has a comptime version check.
+//   - Newer Ziglings moved these to rivendell/elrond.zig; if you upgrade the
+//     submodule past that reorg, restore the elrond import.
 
-const elrond = @import("elrond.zig");
+const ziglings = @import("build.zig");
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
@@ -21,10 +28,10 @@ pub fn main(init: std.process.Init) !void {
 
     try w.writeAll("{\n");
     try w.writeAll("  \"version\": \"PLACEHOLDER_COMMIT\",\n");
-    try w.writeAll("  \"zigFloor\": \"0.17.0-dev.607\",\n");
+    try w.writeAll("  \"zigFloor\": \"0.16.0\",\n");
     try w.writeAll("  \"exercises\": [\n");
 
-    for (elrond.exercises, 0..) |ex, i| {
+    for (ziglings.exercises, 0..) |ex, i| {
         // Derive fields from main_file like "001_hello.zig".
         const stem = stemOf(ex.main_file); // "001_hello"
         const number = numberFromStem(stem); // 1
@@ -63,7 +70,7 @@ pub fn main(init: std.process.Init) !void {
             try w.writeAll("\"");
         } else try w.writeAll("null");
         try w.writeAll("\n");
-        try w.writeAll(if (i + 1 < elrond.exercises.len) "    },\n" else "    }\n");
+        try w.writeAll(if (i + 1 < ziglings.exercises.len) "    },\n" else "    }\n");
     }
 
     try w.writeAll("  ]\n}\n");

@@ -1,6 +1,6 @@
---- exercises/047_methods.zig	2026-06-21 16:11:59.110876971 +0200
-+++ answers/047_methods.zig	2026-06-21 16:13:07.066363558 +0200
-@@ -106,7 +106,7 @@
+--- exercises/047_methods.zig	2023-10-03 22:15:22.122241138 +0200
++++ answers/047_methods.zig	2023-10-05 20:04:07.056100214 +0200
+@@ -88,7 +88,7 @@
          for (&aliens) |*alien| {
  
              // *** Zap the alien with the heat ray here! ***

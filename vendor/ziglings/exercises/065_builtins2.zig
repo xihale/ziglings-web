@@ -47,7 +47,7 @@ const Narcissus = struct {
     myself: *Narcissus = undefined,
     echo: void = undefined, // Alas, poor Echo!
 
-    fn FetchTheMostBeautifulType() type {
+    fn fetchTheMostBeautifulType() type {
         return @This();
     }
 };
@@ -70,7 +70,7 @@ pub fn main() void {
     //
     // The fix for this is very subtle, but it makes a big
     // difference!
-    const Type2 = narcissus.FetchTheMostBeautifulType();
+    const Type2 = narcissus.fetchTheMostBeautifulType();
 
     // Now we print a pithy statement about Narcissus.
     print("A {s} loves all {s}es. ", .{
@@ -93,25 +93,36 @@ pub fn main() void {
 
     print("He has room in his heart for:", .{});
 
-    // `field_names` is a slice of strings and it holds the names of the struct's fields
-    // `field_types` is a slice of types and it holds the types of the struct's fields,
-    //               it is guaranteed to be the same length as `field_names`
-    const field_names = @typeInfo(Narcissus).@"struct".field_names;
-    const field_types = @typeInfo(Narcissus).@"struct".field_types;
+    // A StructFields array
+    const fields = @typeInfo(Narcissus).@"struct".fields;
 
+    // 'fields' is a slice of StructFields. Here's the declaration:
+    //
+    //     pub const StructField = struct {
+    //         name: [:0]const u8,
+    //         type: type,
+    //         default_value_ptr: ?*const anyopaque,
+    //         is_comptime: bool,
+    //         alignment: comptime_int,
+    //
+    //         defaultValue() ?sf.type  // Function that loads the
+    //                                  // field's default value from
+    //                                  // `default_value_ptr`
+    //     };
+    //
     // Please complete these 'if' statements so that the field
     // name will not be printed if the field is of type 'void'
     // (which is a zero-bit type that takes up no space at all!):
-    if (field_???[???] != void) {
-        print(" {s}", .{field_???[???]});
+    if (fields[0].??? != void) {
+        print(" {s}", .{fields[0].name});
     }
 
-    if (field_???[???] != void) {
-        print(" {s}", .{field_???[???]});
+    if (fields[1].??? != void) {
+        print(" {s}", .{fields[1].name});
     }
 
-    if (field_???[???] != void) {
-        print(" {s}", .{field_???[???]});
+    if (fields[2].??? != void) {
+        print(" {s}", .{fields[2].name});
     }
 
     // Yuck, look at all that repeated code above! I don't know

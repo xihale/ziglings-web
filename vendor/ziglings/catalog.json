@@ -1,6 +1,6 @@
 {
-  "version": "f39b462659135b26b9d019007f88ee0cac4a341d",
-  "zigFloor": "0.17.0-dev.607",
+  "version": "c6f18ba448089534763055189ed05f019bd4b7b8",
+  "zigFloor": "0.16.0",
   "exercises": [
     {
       "number": 1,
@@ -88,7 +88,7 @@
       "name": "strings",
       "sourcePath": "exercises/006_strings.zig",
       "patchPath": "patches/006_strings.patch",
-      "output": "d=d Major Tom",
+      "output": "d=d ha ha ha Major Tom",
       "checkStdout": false,
       "kind": "exe",
       "linkLibc": false,
@@ -440,7 +440,7 @@
       "name": "defer2",
       "sourcePath": "exercises/028_defer2.zig",
       "patchPath": "patches/028_defer2.patch",
-      "output": "(Goat) (Cat) (Dog) (Dog) (Goat) (Unknown) done.\nAnswer to everything? 42",
+      "output": "(Goat) (Cat) (Dog) (Dog) (Goat) (Unknown) done.",
       "checkStdout": false,
       "kind": "exe",
       "linkLibc": false,
@@ -1533,7 +1533,7 @@
       "kind": "exe",
       "linkLibc": true,
       "hint": null,
-      "skip": true,
+      "skip": false,
       "timestamp": false,
       "runnable": false,
       "notRunnableReason": "link_libc"
@@ -1549,7 +1549,7 @@
       "kind": "exe",
       "linkLibc": true,
       "hint": null,
-      "skip": true,
+      "skip": false,
       "timestamp": false,
       "runnable": false,
       "notRunnableReason": "link_libc"
@@ -1720,7 +1720,7 @@
       "name": "threading2",
       "sourcePath": "exercises/108_threading2.zig",
       "patchPath": "patches/108_threading2.patch",
-      "output": "PI ≈ 3.14159265 (error = 1.0e-9)",
+      "output": "PI ≈ 3.14159265",
       "checkStdout": false,
       "kind": "exe",
       "linkLibc": false,

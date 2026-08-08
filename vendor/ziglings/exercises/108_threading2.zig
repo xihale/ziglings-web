@@ -28,9 +28,9 @@
 // We will not go into the formula and its derivation in detail, but
 // will deal with the series straight away:
 //
-//          4     4     4     4     4
-//  PI = + --- - --- + --- - --- + --- ...
-//          1     3     5     7     9
+//        4     4     4     4     4
+//  PI = --- - --- + --- - --- + --- ...
+//        1     3     5     7     9
 //
 // As you can clearly see, the series starts with the whole number 4 and
 // approaches the circle number by subtracting and adding smaller and
@@ -46,7 +46,7 @@
 // 1,000,000,000 partial values. And for each additional digit we have to
 // add a zero.
 // Even fast computers - and I mean really fast computers - get a bit warmer
-// on the CPU when it comes to a large number of digits. But 8 digits are
+// on the CPU when it comes to really many digits. But the 8 digits are
 // enough for us for now, because we want to understand the principle and
 // nothing more, right?
 //
@@ -71,28 +71,27 @@
 const std = @import("std");
 
 pub fn main() !void {
-    const count = 500_000_000;
-
+    const count = 1_000_000_000;
     var pi_plus: f64 = 0;
     var pi_minus: f64 = 0;
 
     {
         // First thread to calculate the plus numbers.
-        const handle1 = try std.Thread.spawn(.{}, thread_pi, .{ &pi_plus, 1, count });
+        const handle1 = try std.Thread.spawn(.{}, thread_pi, .{ &pi_plus, 5, count });
         defer handle1.join();
 
         // Second thread to calculate the minus numbers.
         ???
+        
     }
-
     // Here we add up the results.
-    std.debug.print("PI ≈ {d:.8} (error = {e:.1})\n", .{ pi_plus - pi_minus, std.math.pi - (pi_plus - pi_minus) });
+    std.debug.print("PI ≈ {d:.8}\n", .{4 + pi_plus - pi_minus});
 }
 
-fn thread_pi(pi: *f64, begin: u64, count: u64) !void {
-    for (0..count) |i| {
-        const term = 4 / @as(f64, @floatFromInt(begin + 4 * i));
-        pi.* += term;
+fn thread_pi(pi: *f64, begin: u64, end: u64) !void {
+    var n: u64 = begin;
+    while (n < end) : (n += 4) {
+        pi.* += 4 / @as(f64, @floatFromInt(n));
     }
 }
 // If you wish, you can increase the number of loop passes, which
@@ -104,14 +103,8 @@ fn thread_pi(pi: *f64, begin: u64, count: u64) !void {
 // is created. Otherwise the debug functions slow down the speed
 // to such an extent that seconds become minutes during execution.
 //
-// You can use the following command to build and run this
-// exercise with the "ReleaseFast" flag:
-//
-//      zig run exercises/108_threading2.zig -O ReleaseFast
-//
 // And you should remove the formatting restriction in "print",
 // otherwise you will not be able to see the additional digits.
 //
-// If count = 2_500_000_000_000, you should see the following:
+// If count = 10_000_000_000_000 you should see the following:
 // 3.141592653589
-// (after waiting on the order of 1000 seconds, or 17 minutes)
