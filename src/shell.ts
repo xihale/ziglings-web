@@ -697,6 +697,7 @@ function bootEditor(initialDoc: string): void {
         indentUnit.of("    "),
         keymap.of([
           indentWithTab,
+          { key: "Mod-s", preventDefault: true, run: formatDocument },
         ]),
         zigLanguage,
         syntaxHighlighting(highlightStyle),
