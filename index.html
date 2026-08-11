@@ -41,6 +41,7 @@
 
         <section class="pane pane-editor">
             <div id="editor"></div>
+            <div id="vim-status" hidden></div>
             <div class="resizer resizer-v" data-resize="solution" role="separator" aria-label="Resize solution" hidden></div>
             <div id="solution-editor" hidden></div>
         </section>
@@ -76,6 +77,14 @@
                         <div><kbd>F10</kbd><span class="shortcut-desc">Run / Next</span></div>
                         <div><kbd>Ctrl/⌘S</kbd><span class="shortcut-desc">Format code</span></div>
                     </div>
+                </section>
+                <section class="modal-sec">
+                    <h3>Editor</h3>
+                    <label class="check-row">
+                        <input type="checkbox" id="vim-toggle">
+                        <span class="check-label">Vim mode</span>
+                        <span class="check-desc">Modal keybindings (hjkl, i, :w)</span>
+                    </label>
                 </section>
                 <section class="modal-sec">
                     <h3>About</h3>

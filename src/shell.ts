@@ -7,7 +7,7 @@
 //
 // See docs/superpowers/specs/2026-07-28-ziglings-web-fork-design.md §3-§5.
 
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment } from "@codemirror/state";
 import {
   keymap,
   EditorView,
@@ -17,6 +17,8 @@ import {
   dropCursor,
   rectangularSelection,
   crosshairCursor,
+  highlightActiveLine,
+  highlightActiveLineGutter,
 } from "@codemirror/view";
 import { formatDocument, LSPPlugin } from "@codemirror/lsp-client";
 import { history as cmHistory, defaultKeymap, historyKeymap, indentWithTab } from "@codemirror/commands";
@@ -37,6 +39,7 @@ import {
   completionKeymap,
 } from "@codemirror/autocomplete";
 import { lintKeymap } from "@codemirror/lint";
+import { vim, getCM } from "@replit/codemirror-vim";
 import { zigLanguage } from "@ndim/codemirror-lang-zig";
 import { editorTheme, highlightStyle } from "./theme.ts";
 import { fullLineSelection } from "./full-line-selection.ts";
@@ -98,6 +101,8 @@ const outputEl = $("output-pad");
 const runBtn = $("run") as HTMLButtonElement;
 const solutionEditorEl = $("solution-editor");
 const solutionResizerEl = document.querySelector<HTMLElement>('[data-resize="solution"]');
+const vimStatusEl = $("vim-status");
+const vimCheckboxEl = document.getElementById("vim-toggle") as HTMLInputElement | null;
 
 // Sidebar collapse persists across sessions. Default collapsed — the dot
 // column is the primary view; labels are an on-demand expansion.
@@ -107,6 +112,16 @@ function loadSidebarCollapsed(): boolean {
 }
 function saveSidebarCollapsed(v: boolean): void {
   localStorage.setItem(SIDEBAR_KEY, v ? "1" : "0");
+}
+
+// Vim mode persists across sessions. Opt-in — modal editing breaks input for
+// non-vim users, so the default is off.
+const VIM_KEY = "ziglings:vim";
+function loadVim(): boolean {
+  return localStorage.getItem(VIM_KEY) === "1";
+}
+function saveVim(v: boolean): void {
+  localStorage.setItem(VIM_KEY, v ? "1" : "0");
 }
 
 // ─── Pane resizers ────────────────────────────────────────────────
@@ -679,6 +694,14 @@ function replaceDoc(text: string): void {
   editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: text } });
 }
 
+// Compartment so vim can be toggled at runtime without rebuilding the editor
+// (preserves doc + selection). Reconfigure with vim() or [] to enable/disable.
+// The always-on active-line extensions layer on top of the EmptyOnly variant
+// in playgroundSetup so the caret row stays highlighted during j/k motion and
+// in visual mode (where selections are non-empty and EmptyOnly suppresses).
+const vimCompartment = new Compartment();
+let vimOn = loadVim();
+
 function bootEditor(initialDoc: string): void {
   editor = new EditorView({
     parent: $("editor"),
@@ -695,6 +718,7 @@ function bootEditor(initialDoc: string): void {
         zigLanguage,
         syntaxHighlighting(highlightStyle),
         lspClient.plugin("file:///main.zig"),
+        vimCompartment.of(vimOn ? [vim(), highlightActiveLine(), highlightActiveLineGutter()] : []),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) scheduleDraftSave();
         }),
@@ -705,6 +729,46 @@ function bootEditor(initialDoc: string): void {
   // ZLS now so its worker loads and drains buffered requests before the
   // client's request timeout fires.
   bootZlsOnce();
+  applyVim();
+}
+
+// ─── Vim mode ─────────────────────────────────────────────────────
+
+// @replit/codemirror-vim emits "vim-mode-change" on the CodeMirror 5 view
+// adapter (retrieved via getCM). We render the current mode in a status bar
+// under the editor so modal state is visible.
+function bindVimStatus(): void {
+  const cm = getCM(editor);
+  if (!cm) return;
+  cm.on("vim-mode-change", (e: { mode: string; subMode?: string }) => {
+    const label =
+      e.mode === "insert" ? "INSERT" :
+      e.mode === "visual" ? "VISUAL" :
+      e.mode === "replace" ? "REPLACE" :
+      "NORMAL";
+    vimStatusEl.textContent = `-- ${label} --`;
+  });
+}
+
+function toggleVim(on: boolean): void {
+  if (on === vimOn) return;
+  vimOn = on;
+  saveVim(on);
+  editor.dispatch({
+    effects: vimCompartment.reconfigure(
+      on ? [vim(), highlightActiveLine(), highlightActiveLineGutter()] : [],
+    ),
+  });
+  applyVim();
+}
+
+// Sync checkbox state + status-bar visibility with the current vimOn flag.
+// Called both at boot (after the editor exists) and after a toggle.
+function applyVim(): void {
+  vimStatusEl.hidden = !vimOn;
+  vimStatusEl.textContent = vimOn ? "-- NORMAL --" : "";
+  if (vimCheckboxEl) vimCheckboxEl.checked = vimOn;
+  if (vimOn) bindVimStatus();
 }
 
 // ─── Check button ─────────────────────────────────────────────────
@@ -904,6 +968,11 @@ settingsModalEl.addEventListener("click", (e) => {
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !settingsModalEl.hidden) closeSettings();
+});
+
+// Vim mode toggle — persisted, applied live via compartment reconfigure.
+vimCheckboxEl?.addEventListener("change", () => {
+  toggleVim(vimCheckboxEl.checked);
 });
 
 // Sidebar collapse — persisted. Toggle button flips the .collapsed class.
