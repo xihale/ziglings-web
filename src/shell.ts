@@ -368,23 +368,16 @@ function resetRunMode(): void {
   runBtn.replaceChildren(spinner, document.createTextNode("Run"));
 }
 
-/** Line-by-line diff for output_mismatch. */
-function renderDiff(expected: string, actual: string): string {
-  const expLines = expected.split("\n");
-  const actLines = actual.split("\n");
-  const rows: string[] = [];
-  const n = Math.max(expLines.length, actLines.length);
-  rows.push('<table class="diff"><thead><tr><th>Expected</th><th>Yours</th></tr></thead><tbody>');
-  for (let i = 0; i < n; i++) {
-    const e = expLines[i] ?? "";
-    const a = actLines[i] ?? "";
-    const diff = e !== a;
-    rows.push(
-      `<tr class="${diff ? "diff-row" : ""}"><td><pre>${esc(e)}</pre></td><td><pre>${esc(a)}</pre></td></tr>`,
-    );
-  }
-  rows.push("</tbody></table>");
-  return rows.join("");
+/** Expected-output preview for output_mismatch.
+ *
+ *  The learner's actual output is already in the output pane below (yellow
+ *  stdout), so the verdict only shows the expected output here — no duplicate
+ *  "Yours" column, no side-by-side table. Just the expected text as a bare
+ *  mono block, the same quiet voice as the rest of the verdict. `actual` is
+ *  unused; kept on the signature so the caller (and any future caller) reads
+ *  naturally. */
+function renderExpected(expected: string, _actual?: string): string {
+  return `<pre class="expected">${esc(expected)}</pre>`;
 }
 
 function esc(s: string): string {
@@ -544,7 +537,7 @@ function finishCheck(v: Verdict): void {
     } else if (v.failKind === "output_mismatch" && v.expected !== undefined && v.actual !== undefined) {
       renderVerdict({
         cls: "err",
-        parts: [`<p class="err">Output mismatch</p>`, renderDiff(v.expected, v.actual)],
+        parts: [`<p class="err">Output mismatch</p>`, `<p class="muted">Expected:</p>`, renderExpected(v.expected, v.actual)],
         actions: current.hint ? [{ label: "Hint", fn: showHint }] : [],
       });
     }

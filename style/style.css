@@ -1217,29 +1217,21 @@ html.sidebar-collapsed .ex-label { display: none; }
 }
 .verdict-box .hint { color: var(--body-mid); white-space: pre-wrap; }
 
-/* Diff table */
-.diff { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.25rem 0 0.5rem 0; }
-.diff th {
-    text-align: left;
-    color: var(--body-mid);
+/* Expected-output preview (output_mismatch). Bare mono block — same voice as
+   the output pane, no boxed table. The learner's actual output lives in the
+   output pane below; the verdict only carries the expected text. */
+.verdict-box .expected {
+    margin: 0.25rem 0 0.5rem 0;
+    padding: 0;
     font-family: var(--editor-font-mono);
-    font-size: 0.75rem;
-    font-weight: 400;
-    letter-spacing: 0.02em;
-    padding: 0.2rem 0.5rem;
-    border-bottom: 1px solid var(--hairline);
-}
-.diff td { vertical-align: top; padding: 0; width: 50%; }
-.diff td pre {
-    margin: 0;
-    padding: 0.15rem 0.5rem;
-    font-family: var(--editor-font-mono);
+    font-size: 0.82rem;
+    line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;
     color: var(--body);
-    line-height: 1.45;
 }
-.diff-row td pre { background: rgba(166, 107, 107, 0.13); }
+/* "Expected:" label sits tight above the block, not a full status line. */
+.verdict-box .muted + .expected { margin-top: 0; }
 
 /* Follow-up action buttons inside the verdict (Next / Hint / Reveal|Hide).
    Bare text — same language as the toolbar. */
