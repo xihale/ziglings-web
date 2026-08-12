@@ -47,6 +47,7 @@ import {
   highlightActiveLineEmptyOnly,
   highlightActiveLineGutterEmptyOnly,
 } from "./active-line.ts";
+import { relativeLineNumbers } from "./relative-numbers.ts";
 import { lspClient, initZls } from "./lsp.ts";
 import { loadVersionsManifest } from "./version.ts";
 import { ZigSharedClient } from "./zig-shared-client";
@@ -639,7 +640,9 @@ function goNext(): void {
 // ─── Editor ───────────────────────────────────────────────────────
 
 const playgroundSetup = [
-  lineNumbers(),
+  // lineNumbers() is added per-editor (see lineNumberCompartment below) so the
+  // main editor can swap absolute ↔ relative when vim toggles; the
+  // solution/editor keeps plain absolute numbering.
   highlightActiveLineGutterEmptyOnly(),
   highlightSpecialChars(),
   cmHistory(),
@@ -702,6 +705,12 @@ function replaceDoc(text: string): void {
 const vimCompartment = new Compartment();
 let vimOn = loadVim();
 
+// Line numbers live in their own compartment so toggling vim swaps the whole
+// gutter: relative (caret row = 0, vim-style) when vim is on, plain absolute
+// otherwise. Reconfiguring rebuilds the gutter, so the format flips cleanly.
+const lineNumberCompartment = new Compartment();
+const lineNumberExt = (on: boolean) => on ? relativeLineNumbers() : lineNumbers();
+
 function bootEditor(initialDoc: string): void {
   editor = new EditorView({
     parent: $("editor"),
@@ -718,6 +727,7 @@ function bootEditor(initialDoc: string): void {
         zigLanguage,
         syntaxHighlighting(highlightStyle),
         lspClient.plugin("file:///main.zig"),
+        lineNumberCompartment.of(lineNumberExt(vimOn)),
         vimCompartment.of(vimOn ? [vim(), highlightActiveLine(), highlightActiveLineGutter()] : []),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) scheduleDraftSave();
@@ -755,9 +765,14 @@ function toggleVim(on: boolean): void {
   vimOn = on;
   saveVim(on);
   editor.dispatch({
-    effects: vimCompartment.reconfigure(
-      on ? [vim(), highlightActiveLine(), highlightActiveLineGutter()] : [],
-    ),
+    effects: [
+      vimCompartment.reconfigure(
+        on ? [vim(), highlightActiveLine(), highlightActiveLineGutter()] : [],
+      ),
+      // Swap the gutter alongside the keybindings: relative numbers only make
+      // sense with modal motion.
+      lineNumberCompartment.reconfigure(lineNumberExt(on)),
+    ],
   });
   applyVim();
 }
@@ -862,6 +877,7 @@ function bootSolutionEditor(): void {
       doc: "",
       extensions: [
         playgroundSetup,
+        lineNumbers(),
         editorTheme,
         indentUnit.of("    "),
         EditorState.readOnly.of(true),

@@ -1091,7 +1091,7 @@ kbd {
 /* Vim-mode checkbox row — same rhythm as .modal-row. */
 .check-row {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 0.75rem;
     margin: 0;
     padding: 0.45rem 1.2rem;
@@ -1102,6 +1102,45 @@ kbd {
 .check-row input { flex: 0 0 auto; }
 .check-row .check-label { color: var(--body); }
 .check-row .check-desc { color: var(--body-mid); font-size: 0.8rem; }
+
+/* Custom checkbox — the native blue/white box clashes with the bare-text
+   language (borderless buttons/selects, hairline-only chrome). appearance:none
+   turns it into a quiet hairline square that fills with the sunset accent when
+   set, matching <kbd>'s hairline and the editor's focus ring. */
+.check-row input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--hairline-bright);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    position: relative;
+    flex: 0 0 auto;
+    transition: background 120ms, border-color 120ms;
+}
+.check-row input[type="checkbox"]:hover { border-color: var(--ink); }
+.check-row input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+.check-row input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 0;
+    width: 4px;
+    height: 8px;
+    border: solid var(--canvas);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+.check-row input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--editor-focus-ring);
+    outline-offset: 1px;
+}
 
 /* ─── Three-pane shell ────────────────────────────────────────────
    Flex row: sidebar | resizer | editor | resizer | context. Widths are
