@@ -732,6 +732,119 @@ body.embed:not(.has-run) #editor-pane {
     border-color: var(--body-mid) !important;
 }
 
+/* ─── CodeMirror panels (vim bar, LSP dialogs, rename, references) ─
+   CodeMirror ships .cm-panels with a LIGHT baseTheme — #f5f5f5 ground,
+   black text, #ddd hairlines — and this project never opts into CM's
+   dark theme (shell.ts sets no `dark` flag on the editor). The &light
+   rule compiles to ".cm-<rand> .cm-panels" (specificity 0,2,0) and is
+   injected at runtime, so it would otherwise win over a plain class
+   selector loaded from this static sheet. Every docked strip therefore
+   renders as a foreign light-grey band over the near-black canvas:
+     • the vim ":" command line and its auto-dismissing messages
+       (.cm-vim-panel, bottom)
+     • LSP top-of-editor dialogs (.cm-lsp-message) — ZLS connection
+       errors, timeouts, server notices via window/showMessage (top)
+     • the rename / reference panels
+   Repaint the whole panel system here, in the site's hairline-separated
+   dark idiom. Scope under .cm-editor and use !important — same load-order
+   insurance convention as .cm-tooltip above. */
+.cm-editor .cm-panels {
+    background-color: var(--canvas) !important;
+    color: var(--body) !important;
+    font-family: var(--editor-font-mono);
+    font-size: calc(var(--editor-font-size) - 2px);
+    line-height: 1.5;
+}
+.cm-editor .cm-panels-top    { border-bottom: 1px solid var(--hairline) !important; }
+.cm-editor .cm-panels-bottom { border-top:    1px solid var(--hairline) !important; }
+
+/* Vim ":" command line + its transient messages (substitution counts,
+   "Pattern not found", …) share .cm-vim-panel at the bottom. */
+.cm-vim-panel {
+    font: inherit !important;            /* beat CM's generic monospace */
+    padding: 0.35rem 0.75rem;            /* 12px aligns with code padding */
+}
+.cm-vim-panel input {
+    font: inherit;                       /* <input> doesn't inherit by default */
+    color: var(--code-text-color);       /* command text reads as code */
+    caret-color: var(--code-text-color); /* same caret as the editor */
+    background: transparent;
+    width: 100%;
+}
+
+/* LSP dialogs docked at the top: reportError + window/showMessage. */
+.cm-dialog { padding: 0.4rem 2rem 0.4rem 0.75rem !important; } /* room for ✕ */
+.cm-dialog-close {
+    color: var(--body-mid);
+    font: inherit;
+}
+.cm-dialog-close:hover { color: var(--ink); }
+.cm-lsp-message-error   { color: var(--status-err); }   /* muted red */
+.cm-lsp-message-warning { color: var(--status-busy); }  /* muted yellow */
+.cm-lsp-message-info    { color: var(--body); }
+
+/* ─── CM controls & highlights (search panel, snippets, …) ──────
+   The same light-theme leak as the panels above: CodeMirror ships
+   light defaults for every control and highlight, which render as
+   pale foreign blobs on the dark canvas. The remaining stragglers
+   (button, textfield, search/selection highlight, snippet fields,
+   special chars, stacked-tooltip divider) are collected here so the
+   whole surface reads as one theme. !important beats the runtime-
+   injected "&light …" rules (specificity 0,2,0); same convention.
+
+   Search-panel controls — a filled, hairlined button so the action
+   buttons (Next/Prev/Replace/Done) read as clickable, plus a matching
+   hairlined input. The site's bare-text language suits toolbar segments
+   but is too quiet for free-standing action buttons in a panel. */
+.cm-button {
+    background-color: var(--canvas-soft) !important;
+    background-image: none !important;        /* wipe the light gradient */
+    border: 1px solid var(--hairline-bright) !important;
+    border-radius: 2px !important;            /* same restraint as .cm-foldPlaceholder */
+    color: var(--body) !important;
+}
+.cm-button:hover,
+.cm-button:focus-visible {
+    color: var(--ink) !important;
+    border-color: var(--body-mid) !important;
+    background-color: var(--canvas-mid) !important;
+    outline: none !important;
+}
+.cm-button:active {
+    background-color: var(--canvas-mid) !important;
+}
+.cm-textfield {
+    background-color: transparent !important;  /* wipe CM's white field */
+    border: 1px solid var(--hairline-bright) !important;
+    border-radius: 0 !important;
+    color: var(--body);
+    caret-color: var(--code-text-color);
+}
+.cm-textfield:focus {
+    border-color: var(--editor-focus-ring) !important;
+    outline: none !important;
+}
+
+/* Search + selection highlighting — warm zig-yellow wash for matches,
+   sunset accent for the active match; selection-match stays neutral so
+   the three layers stay legible when they overlap (CM's defaults are
+   flat #ffff0054 / #ff6a0054 / #99ff7780, which read harsh on dark). */
+.cm-searchMatch          { background-color: rgba(247, 164, 29, 0.25) !important; } /* zig-yellow */
+.cm-searchMatch-selected { background-color: rgba(255, 122, 23, 0.45) !important; } /* sunset */
+.cm-selectionMatch       { background-color: rgba(255, 255, 255, 0.08) !important; }
+.cm-selectionMatch-main  { background-color: rgba(255, 255, 255, 0.14) !important; }
+
+/* Autocomplete snippet tab-stop fields (CM light paints these #00000022,
+   which is near-invisible on a near-black canvas). */
+.cm-snippetField         { background-color: rgba(255, 255, 255, 0.10) !important; }
+
+/* Non-printing / special characters — pure red is too loud on dark. */
+.cm-specialChar          { color: var(--status-err) !important; }
+
+/* Hairline between stacked tooltip sections (e.g. autocomplete list +
+   its docs panel) instead of CM's light #bbb. */
+.cm-tooltip-section:not(:first-child) { border-top: 1px solid var(--hairline) !important; }
+
 /* ═══════════════════════════════════════════════════════════════════
    Ziglings Web shell (course layout). Appended after the playground's
    CodeMirror theme; reuses theme tokens defined at the top of this file.
