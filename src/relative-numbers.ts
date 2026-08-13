@@ -49,7 +49,10 @@ export function relativeLineNumbers(): Extension {
     renderEmptyElements: false,
     lineMarker(view: EditorView, line) {
       const no = view.state.doc.lineAt(line.from).number;
-      return new NumberMarker(String(Math.abs(no - caretLine(view.state))));
+      const caret = caretLine(view.state);
+      // The caret row shows its absolute line number; every other row shows
+      // its distance from the caret (1, 2, 3 … above and below).
+      return new NumberMarker(no === caret ? String(no) : String(Math.abs(no - caret)));
     },
     // Re-render whenever the caret moves (the whole point — without this the
     // built-in gutter skips selection-only updates and numbers go stale).
