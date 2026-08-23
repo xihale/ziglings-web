@@ -63,6 +63,14 @@ git add versions.json && git commit -m "pin zp-loader"
 CI (Check 3) fails if the served loader drifts from the pin, so a mismatch
 surfaces at deploy time instead of on the user's machine.
 
+## Deployment
+
+**Site:** https://ziglings.xihale.top/ — served by Caddy on zzy_hk from
+`/srv/ziglings-web`. A push to `main` triggers a server-side deploy (GitHub
+webhook → socket-activated receiver → `scripts/server/deploy.sh`: fetch, run
+the CI gate, build, rsync). GitHub Actions here is PR feedback only and never
+touches the server. See `scripts/server/README.md`.
+
 ## Repo layout
 
 ```

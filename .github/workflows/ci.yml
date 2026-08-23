@@ -6,12 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# PR feedback only — production deploys happen server-side on zzy_hk
+# (push webhook → scripts/server/webhook.mjs → deploy.sh); see
+# scripts/server/README.md. GitHub-hosted runners never touch the VPS.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Avoid overlapping deploys.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -47,22 +47,5 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - name: Build
+      - name: Build smoke (the deployed build runs on the server)
         run: npm run build
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    # Deploy only on main pushes (not PRs).
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v5
