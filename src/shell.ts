@@ -65,6 +65,7 @@ import { applyPatch } from "./patch.ts";
 import {
   loadProgress, loadDrafts, markSolved, markFailed, isSolved, isFailed,
   getDraft, setDraft, buildExport, exportFilename, importBundle,
+  BOOT_PLACEHOLDER,
   type Progress, type Drafts,
 } from "./storage.ts";
 import { CheckTracker } from "./check-state";
@@ -80,6 +81,13 @@ let catalog: Catalog;
 let progress: Progress;
 let drafts: Drafts;
 let current: Exercise | null = null;
+// Slug of the exercise whose source is actually in the editor doc. Null while
+// a switch is in flight (openExercise awaits loadSource with the OLD doc — or
+// the boot placeholder — still on screen and `current` already moved). Drafts
+// may only be saved while this matches `current`, or a keystroke in that
+// window persists stale text under the wrong slug (the "// loading…" draft
+// poisoning bug).
+let docOwner: string | null = null;
 let editor: EditorView;
 // Second editor instance for the official solution (revealed on demand after
 // a pass). Hidden until revealSolution() boots it.
@@ -600,6 +608,8 @@ async function openExercise(n: number): void {
   const ex = byNumber(catalog, n);
   if (!ex) return;
   current = ex;
+  // Doc on screen is stale from here until replaceDoc lands — see docOwner.
+  docOwner = null;
   setRoute(n);
   exerciseSelectEl.value = String(ex.number);
   clearOutput();
@@ -627,7 +637,7 @@ async function openExercise(n: number): void {
     }
   }
 
-  replaceDoc(source);
+  replaceDoc(source, ex.slug);
 
   if (!ex.runnable) {
     renderVerdict({
@@ -699,11 +709,13 @@ const playgroundSetup = [
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleDraftSave(): void {
-  if (!current) return;
+  // Only persist edits that belong to the exercise `current` points at —
+  // never the boot placeholder or a previous exercise's leftover doc.
+  if (!current || docOwner !== current.slug) return;
   if (saveTimer !== null) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    if (!current) return;
+    if (!current || docOwner !== current.slug) return;
     drafts = setDraft(drafts, current.slug, editorSource());
   }, 300);
 }
@@ -712,7 +724,8 @@ function editorSource(): string {
   return editor.state.doc.toString();
 }
 
-function replaceDoc(text: string): void {
+function replaceDoc(text: string, slug: string): void {
+  docOwner = slug;
   editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: text } });
 }
 
@@ -1071,7 +1084,7 @@ async function boot(): Promise<void> {
   applySidebarCollapsed();
 
   // Boot editor with a placeholder; real doc loads on openExercise.
-  bootEditor("// loading…");
+  bootEditor(BOOT_PLACEHOLDER);
 
   // Resolve landing exercise from URL, else first-unsolved.
   const routed = routeNumber();

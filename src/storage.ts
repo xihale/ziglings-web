@@ -24,6 +24,23 @@ export interface Drafts {
     drafts: Record<string, string>; // slug → source
 }
 
+/**
+ * Doc the editor boots with before the first exercise loads (shell.ts
+ * bootEditor). It must never survive as a draft: if the source fetch fails,
+ * a keystroke on the placeholder would otherwise persist it for that slug,
+ * and the exercise would open on "// loading…" forever after.
+ */
+export const BOOT_PLACEHOLDER = "// loading…";
+
+/** Drop placeholder-equal drafts (repairs already-poisoned localStorage). */
+function sanitizeDrafts(d: Partial<Drafts> | undefined): Drafts {
+    const drafts: Record<string, string> = {};
+    for (const [slug, src] of Object.entries(d?.drafts ?? {})) {
+        if (src !== BOOT_PLACEHOLDER) drafts[slug] = src as string;
+    }
+    return { version: 1, drafts };
+}
+
 const EMPTY_PROGRESS: Progress = { version: 2, ziglingsCommit: "", solved: {}, failed: {} };
 const EMPTY_DRAFTS: Drafts = { version: 1, drafts: {} };
 
@@ -100,7 +117,7 @@ export function solvedCount(p: Progress): number {
 // ─── Drafts ───────────────────────────────────────────────────────
 
 export function loadDrafts(): Drafts {
-    return readJSON<Drafts>(DRAFTS_KEY, EMPTY_DRAFTS);
+    return sanitizeDrafts(readJSON<Partial<Drafts>>(DRAFTS_KEY, EMPTY_DRAFTS));
 }
 
 export function saveDrafts(d: Drafts): void {
@@ -171,7 +188,7 @@ export function importBundle(
             : EMPTY_PROGRESS;
     const drafts: Drafts =
         b.drafts && b.drafts.version === 1
-            ? { version: 1, drafts: b.drafts.drafts ?? {} }
+            ? sanitizeDrafts(b.drafts)
             : EMPTY_DRAFTS;
     saveProgress(progress);
     saveDrafts(drafts);

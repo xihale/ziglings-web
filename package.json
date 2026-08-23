@@ -9,7 +9,7 @@
     "smoke-verify": "node --import tsx scripts/smoke-verify.ts",
     "check-version-alignment": "node scripts/check-version-alignment.mjs",
     "pin-loader": "node scripts/pin-loader.mjs",
-    "test": "node test/check-catalog.test.mjs && node --import tsx test/trim-lines.test.ts && node --import tsx test/modules.test.ts && node --import tsx test/check-state.test.ts && node --import tsx test/loader-pin.test.ts",
+    "test": "node test/check-catalog.test.mjs && node --import tsx test/trim-lines.test.ts && node --import tsx test/modules.test.ts && node --import tsx test/check-state.test.ts && node --import tsx test/loader-pin.test.ts && node --import tsx test/draft-guard.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
