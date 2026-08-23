@@ -8,6 +8,7 @@
 //
 // Fails (exit 1) if the floor exceeds the served compiler, blocking deploy.
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -91,4 +92,33 @@ if (ord === 0) {
     console.log(`version alignment: OK (cores match; dev suffixes require human eye on bump)`);
 } else {
     console.log(`version alignment: OK (served core newer than floor)`);
+}
+
+// ─── Loader integrity pin ───────────────────────────────────────────────
+// The app executes <assetOrigin>/zp-loader.js as remote code in its workers
+// (src/utils.ts). If versions.json pins loaderSha256, the served bytes must
+// still match — otherwise the site refuses to boot on the user's machine.
+// Failing here surfaces drift at deploy time instead.
+const pin = manifest.loaderSha256;
+if (!pin) {
+    console.log("loader pin: SKIP (versions.json has no loaderSha256 — run `npm run pin-loader -- --write`)");
+} else {
+    try {
+        const base = origin.endsWith("/") ? origin : `${origin}/`;
+        const res = await fetch(`${base}zp-loader.js`, { redirect: "follow" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        const hash = createHash("sha256").update(text, "utf8").digest("hex");
+        if (hash !== pin.toLowerCase()) {
+            console.error(`\nloader pin: FAIL — served zp-loader.js changed without a versions.json bump`);
+            console.error(`  served: ${hash}`);
+            console.error(`  pinned: ${pin}`);
+            console.error("  If intentional, run `npm run pin-loader -- --write` and commit versions.json.");
+            process.exit(1);
+        }
+        console.log(`loader pin: OK (zp-loader.js SHA-256 matches versions.json)`);
+    } catch (err) {
+        console.error(`loader pin: FAIL — could not verify served zp-loader.js (${err})`);
+        process.exit(1);
+    }
 }

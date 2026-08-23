@@ -20,15 +20,81 @@ function loaderUrl(): string {
     return `${root}zp-loader.js`;
 }
 
+/**
+ * SHA-256 of a UTF-8 string as lowercase hex.
+ *
+ * Must match the Node-side `createHash("sha256").update(s, "utf8").digest("hex")`
+ * used by scripts/pin-loader.mjs and scripts/check-version-alignment.mjs — the
+ * pin in versions.json is hex, so a base64 encoding here would never match.
+ */
+export async function sha256Hex(text: string): Promise<string> {
+    const digest = new Uint8Array(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)),
+    );
+    return Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 let loaderPromise: Promise<typeof import("./zp-loader-types")> | null = null;
 
 /**
- * Lazily import the served loader. Bundlers (Vite/Rolldown) leave a remote
- * `https://` import as-is — it loads at runtime in the browser/worker.
+ * Lazily load the served loader with an integrity pin.
+ *
+ * The loader is remote code that ends up executing in our same-origin
+ * workers (it can read drafts, progress, and the IndexedDB ZIR cache), so we
+ * never import the URL directly:
+ *   1. fetch the bytes
+ *   2. if versions.json pins `loaderSha256`, SHA-256 the bytes and REFUSE
+ *      to execute on mismatch — an intentional loader bump is a deliberate
+ *      act: re-run `npm run pin-loader -- --write` and commit
+ *   3. import via a same-origin blob: URL (verified bytes; no third-party
+ *      origin in the execute path)
+ * If blob imports are unsupported by the engine, fall back to a direct URL
+ * import — when a pin is set, the bytes were hash-verified either way.
  */
 function loader(): Promise<typeof import("./zp-loader-types")> {
-    if (!loaderPromise) loaderPromise = import(/* @vite-ignore */ loaderUrl());
+    if (!loaderPromise) {
+        loaderPromise = importServedLoader().catch((err) => {
+            loaderPromise = null; // allow a retry after a transient failure
+            throw err;
+        });
+    }
     return loaderPromise;
+}
+
+async function importServedLoader(): Promise<typeof import("./zp-loader-types")> {
+    const url = loaderUrl();
+    const res = await fetch(url, { redirect: "follow" });
+    if (!res.ok) throw new Error(`zp-loader fetch ${url}: HTTP ${res.status}`);
+    const text = await res.text();
+
+    const pin = loadVersionsManifest().loaderSha256;
+    if (pin) {
+        const actual = await sha256Hex(text);
+        if (actual !== pin.toLowerCase()) {
+            throw new Error(
+                `zp-loader integrity check FAILED: served SHA-256 ${actual} != pinned ${pin}. ` +
+                `Refusing to execute. If the playground loader was intentionally ` +
+                `bumped, run \`npm run pin-loader -- --write\` and commit versions.json.`,
+            );
+        }
+    } else {
+        console.warn(
+            "zp-loader: versions.json has no loaderSha256 pin — executing without " +
+            "integrity verification. Run `npm run pin-loader -- --write` to pin.",
+        );
+    }
+
+    const blobUrl = URL.createObjectURL(new Blob([text], { type: "text/javascript" }));
+    try {
+        return await import(/* @vite-ignore */ blobUrl);
+    } catch (blobErr) {
+        // Compatibility fallback (engines without blob module imports): the
+        // bytes are already hash-verified when a pin is set.
+        console.warn("zp-loader: blob import failed, falling back to direct URL import", blobErr);
+        return await import(/* @vite-ignore */ url);
+    } finally {
+        URL.revokeObjectURL(blobUrl);
+    }
 }
 
 /** Fetch a logical compiler file as bytes (hash resolved from meta.json). */

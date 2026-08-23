@@ -22,6 +22,14 @@ export type VersionsManifest = {
    * publishes zp-loader.js. Compiler assets are fetched cross-origin from here.
    */
   assetOrigin?: string;
+  /**
+   * SHA-256 (hex) of the served zp-loader.js at assetOrigin. Enforced at
+   * runtime by src/utils.ts BEFORE the loader executes (the loader is remote
+   * code running in our workers). Refresh with
+   * `npm run pin-loader -- --write` after an intentional loader bump.
+   * Absent = unpinned (loader executes unverified, with a console warning).
+   */
+  loaderSha256?: string;
   versions: VersionEntry[];
 };
 
@@ -32,6 +40,9 @@ function validateManifest(data: VersionsManifest): VersionsManifest {
   const ids = new Set(data.versions.map((v) => v.id));
   if (!ids.has(data.default)) {
     throw new Error(`versions.json: default "${data.default}" not in versions`);
+  }
+  if (data.loaderSha256 !== undefined && !/^[0-9a-f]{64}$/i.test(data.loaderSha256)) {
+    throw new Error("versions.json: loaderSha256 must be 64 hex chars (see npm run pin-loader)");
   }
   return data;
 }

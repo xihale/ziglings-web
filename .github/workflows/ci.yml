@@ -35,7 +35,7 @@ jobs:
         run: npm run smoke-verify
       - name: Unit tests
         run: npm test
-      - name: Check 3 — version alignment (catalog.zigFloor vs served compiler)
+      - name: Check 3 — version alignment (catalog.zigFloor vs served compiler) + loader pin
         run: npm run check-version-alignment
 
   build:

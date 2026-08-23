@@ -43,6 +43,26 @@ git commit -m "bump ziglings"
 The sync is idempotent — identical submodule input produces byte-identical `catalog.json`, so `git diff`
 shows only real content changes.
 
+## Loader integrity pinning
+
+This site is a pure consumer: at runtime its workers execute the playground's
+`zp-loader.js` (fetched from `assetOrigin` in `versions.json`) to download the
+compiler assets. That is remote code running in the site's origin, so it is
+**pinned**: `versions.json → loaderSha256` must match the served bytes, or the
+site refuses to load the loader (see `src/utils.ts`).
+
+```bash
+# Print the SHA-256 of the currently served loader
+npm run pin-loader
+
+# After an intentional loader bump on the playground, refresh the pin and commit
+npm run pin-loader -- --write
+git add versions.json && git commit -m "pin zp-loader"
+```
+
+CI (Check 3) fails if the served loader drifts from the pin, so a mismatch
+surfaces at deploy time instead of on the user's machine.
+
 ## Repo layout
 
 ```
@@ -50,6 +70,7 @@ scripts/
   sync-ziglings.mjs   one-command content regen
   gen-catalog.zig     parses Ziglings' elrond into catalog.json
   check-catalog.mjs   catalog integrity validator
+  pin-loader.mjs      print/refresh the zp-loader.js SHA-256 pin
 vendor/
   ziglings-src/       git submodule → Ziglings
   ziglings/           committed artifacts (exercises, patches, catalog.json)

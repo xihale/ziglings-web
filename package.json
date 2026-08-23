@@ -8,7 +8,8 @@
     "check-catalog": "node scripts/check-catalog.mjs",
     "smoke-verify": "node --import tsx scripts/smoke-verify.ts",
     "check-version-alignment": "node scripts/check-version-alignment.mjs",
-    "test": "node test/check-catalog.test.mjs && node --import tsx test/trim-lines.test.ts && node --import tsx test/modules.test.ts",
+    "pin-loader": "node scripts/pin-loader.mjs",
+    "test": "node test/check-catalog.test.mjs && node --import tsx test/trim-lines.test.ts && node --import tsx test/modules.test.ts && node --import tsx test/check-state.test.ts && node --import tsx test/loader-pin.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

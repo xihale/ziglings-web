@@ -67,6 +67,7 @@ import {
   getDraft, setDraft, buildExport, exportFilename, importBundle,
   type Progress, type Drafts,
 } from "./storage.ts";
+import { CheckTracker } from "./check-state";
 
 // ─── Version ──────────────────────────────────────────────────────
 // Single version (master). The shell never shows a version dropdown; the id
@@ -85,9 +86,13 @@ let editor: EditorView;
 let solutionEditor: EditorView | null = null;
 let solutionRevealed = false;
 
-// Check-flow guard: idle (no check in flight) or checking.
-type CheckState = "idle" | "checking";
-let checkState: CheckState = "idle";
+// Check-flow guard + generation invalidation (src/check-state.ts). The two
+// invariants it enforces: (1) a worker reply only acts on the check it was
+// stamped with — switching exercises bumps the generation, so an in-flight
+// reply can never grade (or persist progress for) the exercise we left;
+// (2) the "wait for compiler ready" retry re-checks checks.phase at fire
+// time, so it can never auto-run a check the user did not request.
+const checks = new CheckTracker();
 
 // ─── DOM roots ────────────────────────────────────────────────────
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -407,8 +412,17 @@ let compilerReady = false;
 let workersBooted = false;
 let zlsBooted = false;
 
-// In-flight check state.
-let checkGen = 0;
+// "Wait for the compiler to be ready" retry timer. Owned by the app (not the
+// startCheck call) so an exercise switch can cancel it — otherwise the first
+// ready signal would auto-run a check against whatever exercise is open.
+let compilerWait: ReturnType<typeof setInterval> | null = null;
+
+function clearCompilerWait(): void {
+  if (compilerWait !== null) {
+    clearInterval(compilerWait);
+    compilerWait = null;
+  }
+}
 
 function bootZlsOnce(): void {
   if (zlsBooted) return;
@@ -431,29 +445,29 @@ function onZigWorkerMessage(msg: WorkerMsg): void {
       compilerReady = true;
     } else {
       renderVerdict({ cls: "err", parts: [`<p class="err">Compiler failed to load: ${esc(msg.error)}</p>`] });
-      checkState = "idle";
+      checks.finish();
       runBtn.disabled = current ? !current.runnable : false;
       setRunState("err");
     }
     return;
   }
 
-  const gen = checkGen;
+  // Stale-reply guard: a reply only acts on the check it belongs to. An
+  // exercise switch (checks.invalidate) bumps the generation, so anything
+  // in flight for the previous exercise is dropped here.
+  if (!checks.isCurrent(msg.requestId)) return;
 
   // Compile-stage stderr (diagnostics) — stream into the output panel.
   if (msg.kind === "stderr") {
-    if (msg.requestId !== String(gen)) return;
     appendOutput(msg.text);
     return;
   }
   if (msg.kind === "stdout") {
-    if (msg.requestId !== String(gen)) return;
     appendOutput(msg.text, "stdout");
     return;
   }
 
   if (msg.kind === "failed") {
-    if (msg.requestId !== String(gen)) return;
     finishCheck({
       status: "fail",
       failKind: "compile",
@@ -463,13 +477,12 @@ function onZigWorkerMessage(msg: WorkerMsg): void {
   }
 
   if (msg.kind === "compiled") {
-    if (msg.requestId !== String(gen)) return;
-    runCompiled(msg.wasm, gen);
+    runCompiled(msg.wasm, msg.requestId);
     return;
   }
 }
 
-function runCompiled(wasm: ArrayBuffer, gen: number): void {
+function runCompiled(wasm: ArrayBuffer, requestId: string): void {
   const runner = new RunnerWorker();
   runner.postMessage({ run: wasm }, [wasm]);
   let stdout = "";
@@ -478,7 +491,7 @@ function runCompiled(wasm: ArrayBuffer, gen: number): void {
   let crashed = false;
 
   runner.onmessage = (rev: MessageEvent) => {
-    if (gen !== checkGen) {
+    if (!checks.isCurrent(requestId)) {
       runner.terminate();
       return;
     }
@@ -522,7 +535,9 @@ function renderPassVerdict(): void {
 }
 
 function finishCheck(v: Verdict): void {
-  checkState = "idle";
+  // Terminal state: end the check and drop any (leaked) compiler-wait timer.
+  checks.finish();
+  clearCompilerWait();
   runBtn.disabled = current ? !current.runnable : false;
   if (v.status === "pass" && current) {
     progress = markSolved(progress, current.slug); // also clears failed
@@ -591,9 +606,13 @@ async function openExercise(n: number): void {
   clearVerdict();
   hideSolution();   // new exercise closes any revealed solution
   runBtn.disabled = !ex.runnable;
-  // New exercise resets the check state machine to idle and the button
-  // back to its "Run" verb (it may have become "Next" on the previous pass).
-  checkState = "idle";
+  // New exercise ends the previous check. invalidate() bumps the generation
+  // so an in-flight reply can't grade (or persist progress for) the exercise
+  // we're leaving; clearCompilerWait() stops a pending "loading compiler"
+  // retry from auto-running the exercise we're opening.
+  checks.invalidate();
+  clearCompilerWait();
+  // Button back to its "Run" verb (it may have become "Next" on a pass).
   resetRunMode();
   setRunState("idle");
 
@@ -790,9 +809,8 @@ function applyVim(): void {
 
 function startCheck(): void {
   if (!current || !current.runnable) return;
-  if (checkState === "checking") return;
-  checkState = "checking";
-  checkGen += 1;
+  if (checks.phase === "checking") return;
+  checks.start();
   clearOutput();
   clearVerdict();
   hideSolution();
@@ -803,10 +821,16 @@ function startCheck(): void {
 
   if (!compilerReady) {
     renderVerdict({ cls: "loading", parts: [`<p class="muted">Loading compiler…</p>`] });
-    // Queue: retry once ready.
-    const wait = setInterval(() => {
+    // Queue: retry once ready. The callback re-validates at fire time — if
+    // the user switched exercises meanwhile (checks.invalidate), the stale
+    // retry dies quietly instead of auto-running the newly opened exercise.
+    compilerWait = setInterval(() => {
+      if (checks.phase !== "checking") {
+        clearCompilerWait();
+        return;
+      }
       if (compilerReady) {
-        clearInterval(wait);
+        clearCompilerWait();
         dispatchCompile();
       }
     }, 100);
@@ -816,11 +840,13 @@ function startCheck(): void {
 }
 
 function dispatchCompile(): void {
-  if (!current) return;
+  // Defense in depth: only a live check may dispatch (the compiler-wait
+  // callback above already re-validates; a stray call must not run).
+  if (!current || checks.phase !== "checking") return;
   renderVerdict({ cls: "loading", parts: [`<p class="muted">Checking…</p>`] });
   zigWorker!.dispatch({
     kind: "run",
-    requestId: String(checkGen),
+    requestId: checks.requestId,
     versionId: VERSION_ID,
     source: editorSource(),
     mode: current.kind === "test" ? "test" : "run",
