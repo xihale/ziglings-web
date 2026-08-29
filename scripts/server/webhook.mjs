@@ -12,19 +12,31 @@
  *   clone:  /home/ziglings-ci/ziglings-web
  *   secret: /home/ziglings-ci/.webhook-secret   (shared with the GitHub hook)
  *   log:    /home/ziglings-ci/deploy.log        (deploy.sh output)
+ *   ntfy:   /home/ziglings-ci/.ntfy-notify      (topic + user:pass for webhook-deploy)
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { openSync, readFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readFileSync,
+  readSync,
+  statSync,
+} from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const PROJECT = "ziglings";
+const SERVER = "zzy_hk";
 const SECRET_FILE = process.env.ZL_WEBHOOK_SECRET_FILE ?? "/home/ziglings-ci/.webhook-secret";
 const DEPLOY_SH = join(HERE, "deploy.sh");
 const DEPLOY_LOG = process.env.ZL_DEPLOY_LOG ?? "/home/ziglings-ci/deploy.log";
 const HOOK_PATH = process.env.ZL_HOOK_PATH ?? "/hooks/ziglings-deploy";
 const DEPLOY_BRANCHES = new Set(["main"]);
+const NTFY_CONFIG = process.env.ZL_NTFY_CONFIG ?? "/home/ziglings-ci/.ntfy-notify";
+const NTFY_URL = process.env.ZL_NTFY_URL ?? "https://ntfy.xeed.ink";
 const READ_TIMEOUT_MS = 15_000;
 
 const log = (...a) => console.error(new Date().toISOString(), ...a); // → journald
@@ -153,16 +165,68 @@ if (payload.deleted || !DEPLOY_BRANCHES.has(branch)) {
   process.exit(0);
 }
 
-// Answer before building — GitHub's webhook timeout is ~10s.
+// Push the outcome to the shared ntfy topic `webhook-deploy` (message format
+// unified across all webhook-deployed sites: `[project@server] deploy …`).
+// NTFY_CONFIG holds the topic on line 1 and a user:pass (write-only ACL on
+// the topic) on line 2. Strictly best-effort: a notification outage must
+// never fail a deploy.
+async function notifyNtfy(status, code, sha, startedAt) {
+  try {
+    if (!existsSync(NTFY_CONFIG)) return;
+    const [topic, userPass] = readFileSync(NTFY_CONFIG, "utf8").trim().split("\n");
+    const tookS = Math.max(1, Math.round((Date.now() - Date.parse(startedAt)) / 1000));
+    const short = sha.slice(0, 7);
+    await fetch(`${NTFY_URL}/${topic}`, {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + Buffer.from(userPass).toString("base64"),
+        Title: `[${PROJECT}@${SERVER}] deploy ${status}`,
+        Priority: status === "success" ? "default" : "high",
+        Tags: status === "success" ? "white_check_mark" : "rotating_light",
+      },
+      body:
+        status === "success"
+          ? `${short} live in ${tookS}s`
+          : `${short} failed (exit ${code}): ${failureReason(code)} — ssh ${SERVER}: tail ${DEPLOY_LOG}`,
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch (err) {
+    log("ntfy notify failed:", err.message);
+  }
+}
+
+// The reason a deploy failed: a `FATAL:` line if the run died via die(),
+// else the log's final line. Reads only the tail — deploy.log is
+// append-only and grows without bound.
+function failureReason(code) {
+  try {
+    const size = statSync(DEPLOY_LOG).size;
+    const len = Math.min(size, 8192);
+    const buf = Buffer.alloc(len);
+    const fd = openSync(DEPLOY_LOG, "r");
+    readSync(fd, buf, 0, len, size - len);
+    closeSync(fd);
+    const lines = buf.toString("utf8").trimEnd().split("\n").reverse();
+    return (lines.find((l) => l.includes("FATAL:")) ?? lines[0] ?? "").slice(0, 200) || `exit ${code}`;
+  } catch {
+    return `exit ${code}`;
+  }
+}
+
+// Answer before building — GitHub's webhook timeout is ~10s. — GitHub's webhook timeout is ~10s.
 await respond(200, `deploy started (${ref})\n`);
 log(`push ${String(payload.after ?? "").slice(0, 7)} on ${ref} → deploy`);
 process.stdin.destroy(); // socket served; deploy.sh owns the process now
 
+const sha = String(payload.after ?? "");
+const startedAt = new Date().toISOString();
+
 const logFd = openSync(DEPLOY_LOG, "a");
 const child = spawn("/bin/bash", [DEPLOY_SH, ref], {
   stdio: ["ignore", logFd, logFd],
-  env: { ...process.env, ZL_PUSH_SHA: String(payload.after ?? "") },
+  env: { ...process.env, ZL_PUSH_SHA: sha },
 });
 const code = await new Promise((resolve) => child.on("close", resolve));
+await notifyNtfy(code === 0 ? "success" : "failure", code, sha, startedAt);
 log(`deploy exited ${code}`);
 process.exit(code === 0 ? 0 : 1);
