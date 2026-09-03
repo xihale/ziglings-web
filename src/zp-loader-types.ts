@@ -1,5 +1,5 @@
 /**
- * Local type declaration for the served loader (https://zp.xihale.top/zp-loader.js).
+ * Local type declaration for the served loader (https://zp.xeed.ink/zp-loader.js).
  *
  * The loader is imported remotely at runtime (see src/utils.ts), so TypeScript
  * has no types for it. This module mirrors its public surface for type-safety;

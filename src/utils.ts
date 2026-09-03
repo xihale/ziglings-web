@@ -1,6 +1,6 @@
 /**
  * Compiler asset access for ziglings-web, delegated to the playground's served
- * loader (https://zp.xihale.top/zp-loader.js). The loader owns the
+ * loader (https://zp.xeed.ink/zp-loader.js). The loader owns the
  * hash-filename / meta.json / Cache-Storage contract; this thin wrapper just
  * fixes the loader origin from versions.json → assetOrigin.
  *

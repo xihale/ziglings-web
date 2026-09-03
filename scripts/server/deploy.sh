@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Server-side deploy job for ziglings.xihale.top — started by scripts/server/webhook.mjs
-# (or manually: ssh zzy_hk, then `sudo -u ziglings-ci bash ~/ziglings-web/scripts/server/deploy.sh`).
+# Server-side deploy job for zlg.xeed.ink — started by scripts/server/webhook.mjs
+# (or manually: ssh gx, then `sudo -u ziglings-ci bash ~/ziglings-web/scripts/server/deploy.sh`).
 #
-# ziglings-web is a pure consumer (compilers come from zp.xihale.top via
+# ziglings-web is a pure consumer (compilers come from zp.xeed.ink via
 # zp-loader.js at runtime), so a deploy is just:
 #   1. shallow-fetch main into the persistent clone
 #   2. run the CI gate (catalog integrity, smoke, unit tests, version

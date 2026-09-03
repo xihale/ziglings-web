@@ -2,7 +2,7 @@
 /**
  * Integrity pin for the served zp-loader.js.
  *
- * The app dynamically imports https://zp.xihale.top/zp-loader.js at runtime
+ * The app dynamically imports https://zp.xeed.ink/zp-loader.js at runtime
  * (consumer mode — see src/utils.ts). That is remote code executing in our
  * workers; `loaderSha256` in versions.json pins the exact bytes we accept,
  * so an unintentional (or malicious) loader change on the playground fails

@@ -2,7 +2,7 @@
  * Versions manifest for ziglings-web.
  *
  * ziglings-web is a pure consumer: compiler binaries are fetched from the
- * playground (https://zp.xihale.top/) via the served loader (zp-loader.js),
+ * playground (https://zp.xeed.ink/) via the served loader (zp-loader.js),
  * never self-built. This module therefore only exposes the bundled manifest;
  * the download/cache/hash contract lives in the loader, not here.
  */

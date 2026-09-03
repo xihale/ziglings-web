@@ -6,7 +6,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-# PR feedback only — production deploys happen server-side on zzy_hk
+# PR feedback only — production deploys happen server-side on gx
 # (push webhook → scripts/server/webhook.mjs → deploy.sh); see
 # scripts/server/README.md. GitHub-hosted runners never touch the VPS.
 permissions:

@@ -1,16 +1,16 @@
-# Server-side deploy (ziglings.xihale.top)
+# Server-side deploy (zlg.xeed.ink)
 
 Deploy without a GitHub Actions runner: GitHub sends a **push webhook** to
-`https://ziglings.xihale.top/hooks/ziglings-deploy`; Caddy proxies that path to
+`https://zlg.xeed.ink/hooks/ziglings-deploy`; Caddy proxies that path to
 a systemd **socket-activated** receiver (`webhook.mjs`) that verifies the
 GitHub HMAC-SHA256 signature and runs `deploy.sh`. Nothing runs while idle — a
 receiver process exists only for the seconds a request (or deploy) takes.
 
-ziglings-web is a pure consumer (compilers load from zp.xihale.top via
+ziglings-web is a pure consumer (compilers load from zp.xeed.ink via
 zp-loader.js), so deploys are fetch → checks → vite build → rsync; no compiler
 builds and no submodules needed.
 
-## Pieces (all on zzy_hk)
+## Pieces (all on gx)
 
 | what | where |
 | --- | --- |
@@ -79,12 +79,12 @@ Enable once (root): `systemctl daemon-reload && systemctl enable --now ziglings-
 
 ## Caddy
 
-The `ziglings.xihale.top` site block (security headers used to live in
+The `zlg.xeed.ink` site block (security headers used to live in
 `public/_headers`, which GitHub Pages ignored anyway — Caddy actually applies
 them):
 
 ```caddyfile
-ziglings.xihale.top {
+zlg.xeed.ink {
 	encode zstd gzip
 	root * /srv/ziglings-web
 	@deployhook {
@@ -97,7 +97,7 @@ ziglings.xihale.top {
 	route {
 		reverse_proxy @deployhook unix//run/ziglings-deploy.sock
 		header {
-			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://zp.xihale.top blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://zp.xihale.top; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://zp.xeed.ink blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://zp.xeed.ink; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 			X-Content-Type-Options "nosniff"
 			Referrer-Policy "no-referrer"
 			Cross-Origin-Opener-Policy "same-origin"
@@ -124,18 +124,18 @@ The API needs `url` inside a `config` object (`gh api -f url=…` flattens it to
 the top level and gets a 422):
 
 ```sh
-SECRET=$(ssh zzy_hk 'cat /home/ziglings-ci/.webhook-secret')
-printf '{"name":"web","active":true,"events":["push"],"config":{"url":"https://ziglings.xihale.top/hooks/ziglings-deploy","content_type":"json","secret":"%s"}}' "$SECRET" \
+SECRET=$(ssh gx 'cat /home/ziglings-ci/.webhook-secret')
+printf '{"name":"web","active":true,"events":["push"],"config":{"url":"https://zlg.xeed.ink/hooks/ziglings-deploy","content_type":"json","secret":"%s"}}' "$SECRET" \
   | gh api -X POST repos/xihale/ziglings-web/hooks --input -
 ```
 
 ## Ops
 
 ```sh
-ssh zzy_hk
+ssh gx
 tail -f /home/ziglings-ci/deploy.log                  # deploy output
 journalctl -t ziglings-deploy@ -e                     # receiver lifecycle (start/exit)
-curl -s https://ziglings.xihale.top/deploy-meta.json  # what sha is live
+curl -s https://zlg.xeed.ink/deploy-meta.json  # what sha is live
 # manual deploy:
 sudo -u ziglings-ci bash /home/ziglings-ci/ziglings-web/scripts/server/deploy.sh
 ```
