@@ -9,13 +9,21 @@
  * See docs/superpowers/specs/2026-07-26-shared-compiler-worker-design.md.
  */
 
-// Workers are created from blob URLs (inline), so their CSP is inherited from
+// Dedicated workers are inline (blob URLs), so their CSP is inherited from
 // this no-cache shell. A URL-created worker instead inherits whatever CSP
 // header was cached alongside the immutable /assets chunk — which is how a
 // stale pre-2026-09-16 chunk froze a CSP without 'wasm-unsafe-eval' and broke
 // WASM compilation until a hard refresh.
+//
+// The SharedWorker must stay URL-based: Vite's inline sharedworker template
+// constructs `new SharedWorker("data:…")` directly, and CSP `worker-src
+// 'self' blob:` does not admit data: URLs — that would block the shared
+// compiler for everyone. A URL SharedWorker gets the live CSP header on its
+// (re)fetch, so it is fine for every client that fetches the chunk fresh;
+// clients holding a stale pre-fix chunk still have the inline dedicated
+// fallback below.
 // @ts-ignore — Vite sharedworker import (symmetric with existing ?worker).
-import ZigSharedWorker from "./workers/zig.shared.ts?sharedworker&inline";
+import ZigSharedWorker from "./workers/zig.shared.ts?sharedworker";
 // @ts-ignore — Vite worker import; verbatim fallback path.
 import ZigWorker from "./workers/zig.ts?worker&inline";
 import type { ClientMsg, WorkerMsg } from "./shared-protocol";
