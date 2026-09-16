@@ -69,6 +69,14 @@ class ZlsTransport implements Transport {
 
 const semanticTokensDebounceTimeMS: number = 100;
 
+// zls is an in-page WASI server that boots lazily: fetch zls.wasm + stdlib
+// tar, compile, instantiate — seconds cold. connect() sends `initialize`
+// right away; the worker buffers it until the server is live, so the client
+// timeout must cover the boot, not just the round-trip. The 3s default here
+// fired before zls ever answered ("Request timed out" + late
+// "non-existent request" responses).
+const LSP_REQUEST_TIMEOUT_MS: number = 120_000;
+
 const semanticTokensPlugin = ViewPlugin.fromClass(
   class {
     debounceTimer: number = 0;
@@ -238,6 +246,7 @@ const semanticTokensEffect = StateEffect.define<DecorationSet>({});
 const zlsWorker = new ZLSWorker();
 const transport = new ZlsTransport(zlsWorker);
 const lspClient = new LSPClient({
+  timeout: LSP_REQUEST_TIMEOUT_MS,
   highlightLanguage(name) {
     if (name == "zig") return zigLanguage;
     return null;
@@ -264,6 +273,27 @@ const lspClient = new LSPClient({
 
 /** Tell the ZLS worker which paired compiler tree to load (`/compilers/<id>/`). */
 export function initZls(versionId: string) {
+  // The worker posts {ready:true/false} as a JSON string; the transport only
+  // forwards JSON-RPC, so surface boot progress/failure here — otherwise a
+  // failed boot just looks like LSP silently never coming up.
+  const bootStartedAt = Date.now();
+  const bootObserver = (ev: MessageEvent) => {
+    if (typeof ev.data !== "string") return;
+    try {
+      const data = JSON.parse(ev.data);
+      if (data.ready === true) {
+        console.info(`[lsp] zls ${data.versionId} booted in ${Date.now() - bootStartedAt}ms`);
+      } else if (data.ready === false) {
+        console.error(`[lsp] zls boot failed: ${data.error}`);
+      } else {
+        return;
+      }
+      zlsWorker.removeEventListener("message", bootObserver);
+    } catch {
+      // LSP JSON-RPC traffic, not a boot message
+    }
+  };
+  zlsWorker.addEventListener("message", bootObserver);
   zlsWorker.postMessage({ init: { versionId } });
 }
 
