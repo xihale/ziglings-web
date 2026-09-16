@@ -9,10 +9,15 @@
  * See docs/superpowers/specs/2026-07-26-shared-compiler-worker-design.md.
  */
 
+// Workers are created from blob URLs (inline), so their CSP is inherited from
+// this no-cache shell. A URL-created worker instead inherits whatever CSP
+// header was cached alongside the immutable /assets chunk — which is how a
+// stale pre-2026-09-16 chunk froze a CSP without 'wasm-unsafe-eval' and broke
+// WASM compilation until a hard refresh.
 // @ts-ignore — Vite sharedworker import (symmetric with existing ?worker).
-import ZigSharedWorker from "./workers/zig.shared.ts?sharedworker";
+import ZigSharedWorker from "./workers/zig.shared.ts?sharedworker&inline";
 // @ts-ignore — Vite worker import; verbatim fallback path.
-import ZigWorker from "./workers/zig.ts?worker";
+import ZigWorker from "./workers/zig.ts?worker&inline";
 import type { ClientMsg, WorkerMsg } from "./shared-protocol";
 
 export type { ClientMsg, WorkerMsg } from "./shared-protocol";

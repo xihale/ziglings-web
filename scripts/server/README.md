@@ -92,12 +92,19 @@ zlg.xeed.ink {
 		method POST
 	}
 	@nocache {
-		path */ *.html /versions.json *meta.json */catalog.json
+		# Everything except /assets & /vendor: the SPA fallback shells (/N/,
+		# /index.html) and manifests must revalidate — a stale shell references
+		# retired hashed chunks and try_files then serves index.html for them
+		# (HTML-as-worker-script → message-less worker onerror).
+		not path /assets/* /vendor/*
 	}
 	route {
 		reverse_proxy @deployhook unix//run/ziglings-deploy.sock
 		header {
-			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://zp.xeed.ink blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://zp.xeed.ink; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+			# 'wasm-unsafe-eval' is load-bearing: zls.wasm (LSP) and zig.wasm
+			# (Run/verify) are WebAssembly.compile'd in workers; without it
+			# Chrome rejects compilation with a bare CompileError.
+			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://zp.xeed.ink blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://zp.xeed.ink; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 			X-Content-Type-Options "nosniff"
 			Referrer-Policy "no-referrer"
 			Cross-Origin-Opener-Policy "same-origin"

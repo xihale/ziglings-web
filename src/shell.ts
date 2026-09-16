@@ -53,7 +53,8 @@ import { loadVersionsManifest } from "./version.ts";
 import { ZigSharedClient } from "./zig-shared-client";
 import type { WorkerMsg } from "./shared-protocol";
 // @ts-ignore
-import RunnerWorker from "./workers/runner.ts?worker";
+// Inline (blob) worker: CSP follows the no-cache shell, not cached asset headers.
+import RunnerWorker from "./workers/runner.ts?worker&inline";
 
 import {
   loadCatalog, byNumber, ordered, loadSource, loadPatch,

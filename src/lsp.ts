@@ -16,7 +16,8 @@ import {
 } from "@codemirror/lsp-client";
 import { zigLanguage } from "@ndim/codemirror-lang-zig";
 // @ts-ignore
-import ZLSWorker from "./workers/zls.ts?worker";
+// Inline (blob) worker: CSP follows the no-cache shell, not cached asset headers.
+import ZLSWorker from "./workers/zls.ts?worker&inline";
 
 class ZlsTransport implements Transport {
   public worker: Worker;
