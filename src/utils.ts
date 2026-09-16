@@ -84,17 +84,24 @@ async function importServedLoader(): Promise<typeof import("./zp-loader-types")>
         );
     }
 
+    let mod: typeof import("./zp-loader-types");
     const blobUrl = URL.createObjectURL(new Blob([text], { type: "text/javascript" }));
     try {
-        return await import(/* @vite-ignore */ blobUrl);
+        mod = await import(/* @vite-ignore */ blobUrl);
     } catch (blobErr) {
         // Compatibility fallback (engines without blob module imports): the
         // bytes are already hash-verified when a pin is set.
         console.warn("zp-loader: blob import failed, falling back to direct URL import", blobErr);
-        return await import(/* @vite-ignore */ url);
+        mod = await import(/* @vite-ignore */ url);
     } finally {
         URL.revokeObjectURL(blobUrl);
     }
+    // The loader can't self-locate its home origin through a blob import
+    // (import.meta.url is a blob: URL whose origin is OURS) — without this it
+    // fetches, and Cache-Storage-caches, this site's own SPA fallback as
+    // compiler assets. assetOrigin is the single source of truth.
+    mod.configure({ origin: loadVersionsManifest().assetOrigin });
+    return mod;
 }
 
 /** Fetch a logical compiler file as bytes (hash resolved from meta.json). */
