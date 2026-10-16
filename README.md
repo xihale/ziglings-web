@@ -3,8 +3,8 @@
 A browser-based Zig learning platform that hosts the [Ziglings](https://codeberg.org/ziglings/exercises)
 exercise set with zero-install editing, automatic verification, and progress tracking.
 
-> **Status:** early development. Content pipeline (this repo's first milestone) is in place;
-> the in-browser editor/verifier is forthcoming.
+> **Status:** the content pipeline, the in-browser editor/verifier and progress
+> export/import are in place, and the site is deployed at https://zlg.xeed.ink/.
 
 ## What this is (and isn't)
 
@@ -79,8 +79,11 @@ scripts/
   gen-catalog.zig     parses Ziglings' elrond into catalog.json
   check-catalog.mjs   catalog integrity validator
   pin-loader.mjs      print/refresh the zp-loader.js SHA-256 pin
+src/                  course shell, editor, verifier, LSP client and workers
+style/                page styling
 vendor/
   ziglings-src/       git submodule → Ziglings
   ziglings/           committed artifacts (exercises, patches, catalog.json)
+patches/              Zig playground WASM patches, one per compiler version
 test/                 unit tests (node, no framework)
 ```
